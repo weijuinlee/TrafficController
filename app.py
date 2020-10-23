@@ -1,7 +1,7 @@
 from rq.job import Job
 from flask_restful import reqparse
 from flask import Flask, abort, jsonify, request
-from path_plan import send_coordinates
+from traffic_control_func import send_coordinates
 from redis_func import redis_conn, redis_queue
 
 app = Flask(__name__)
