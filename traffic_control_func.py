@@ -11,6 +11,24 @@ dict_of_priority = {}
 dict_of_robot_shortest_path = {}
 dict_of_coordinates = {}
 
+def initialization(input_data):
+
+    for robot in input_data['robot_id']:
+    
+        URL = "https://shortestpathfinderapi.herokuapp.com/robot/%s"%robot
+        r = requests.get(url = URL)
+        path_data = r.json()
+        coordinates = literal_eval(path_data['coordinates'])
+        dict_of_coordinates.update({robot:coordinates})
+        coordinates_of_shortest = literal_eval(path_data['shortest_path'])
+        dict_of_robot_shortest_path.update({robot:coordinates_of_shortest})
+        robot_priority = (path_data['priority'])
+        dict_of_priority.update({robot:robot_priority})
+        mqtt_payload = payload(robot,'0')
+        client.publish("%s/robot/task"%robot, mqtt_payload)
+
+    time.sleep(10)
+
 def payload(robot,node):
 
     node_coordinate = dict_of_coordinates[robot][node]
@@ -40,21 +58,7 @@ def send_coordinates(input_data):
     finish = False
     nodes_occupied = []
 
-    for robot in input_data['robot_id']:
-        
-        URL = "https://shortestpathfinderapi.herokuapp.com/robot/%s"%robot
-        r = requests.get(url = URL)
-        path_data = r.json()
-        coordinates = literal_eval(path_data['coordinates'])
-        dict_of_coordinates.update({robot:coordinates})
-        coordinates_of_shortest = literal_eval(path_data['shortest_path'])
-        dict_of_robot_shortest_path.update({robot:coordinates_of_shortest})
-        robot_priority = (path_data['priority'])
-        dict_of_priority.update({robot:robot_priority})
-        mqtt_payload = payload(robot,'0')
-        client.publish("%s/robot/task"%robot, mqtt_payload)
-
-    time.sleep(10)
+    initialization(input_data)
 
     if len(input_data['robot_id']) == 1:
 
@@ -64,7 +68,7 @@ def send_coordinates(input_data):
             mqtt_payload = payload(robot,selected_node)
             client.publish("%s/robot/task"%robot, mqtt_payload)
             print("Robot_Id: %s moving to next waypoint."%robot)
-            time.sleep(5)
+            time.sleep(8)
 
         print("One robot")
 
@@ -97,7 +101,7 @@ def send_coordinates(input_data):
                     robot_shortest_path = dict_of_robot_shortest_path[robot]
                     robot_shortest_path.remove(selected_node)
 
-                time.sleep(5)
+                time.sleep(8)
             
             if len(list_of_robots) == 0:
 
