@@ -54,19 +54,22 @@ def send_coordinates(input_data):
         mqtt_payload = payload(robot,'0')
         client.publish("%s/robot/task"%robot, mqtt_payload)
 
-    time.sleep(15)
-
-    print(dict_of_robot_shortest_path)
+    time.sleep(10)
 
     if len(input_data['robot_id']) == 1:
+
+        for i in range(len(dict_of_robot_shortest_path[robot])):
+
+            selected_node = dict_of_robot_shortest_path[robot][i]
+            mqtt_payload = payload(robot,selected_node)
+            client.publish("%s/robot/task"%robot, mqtt_payload)
+            print("Robot_Id: %s moving to next waypoint."%robot)
+            time.sleep(5)
 
         print("One robot")
 
     else:
-        
-        print("More than one robot")
 
-        # for i in range(15):
         while not finish:
 
             list_of_robots = input_data['robot_id']
@@ -94,7 +97,7 @@ def send_coordinates(input_data):
                     robot_shortest_path = dict_of_robot_shortest_path[robot]
                     robot_shortest_path.remove(selected_node)
 
-                time.sleep(4)
+                time.sleep(5)
             
             if len(list_of_robots) == 0:
 
