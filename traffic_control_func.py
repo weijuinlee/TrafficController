@@ -24,10 +24,30 @@ def initialization(input_data):
         dict_of_robot_shortest_path.update({robot:coordinates_of_shortest})
         robot_priority = (path_data['priority'])
         dict_of_priority.update({robot:robot_priority})
-        mqtt_payload = payload(robot,'0')
+        mqtt_payload = return_home_payload(robot)
         client.publish("%s/robot/task"%robot, mqtt_payload)
 
-    time.sleep(10)
+    time.sleep(12)
+
+def return_home_payload(robot):
+
+    payload = '''{
+                "modificationType": "CREATE",
+                "abort": false,
+                "taskType": "GOTO",
+                "parameters": {},
+                "point": {
+                    "mapVerID": "b2a546f9-b7a1-4623-8c93-8a574b8db1f6",
+                    "positionName": "Showroom",
+                    "x": 40,
+                    "y": 700,
+                    "heading": 360
+                },
+                "totalTaskNo": 1,
+                "currTaskNo": 1
+    }'''
+
+    return payload
 
 def payload(robot,node):
 
@@ -60,53 +80,39 @@ def send_coordinates(input_data):
 
     initialization(input_data)
 
-    if len(input_data['robot_id']) == 1:
+    while not finish:
 
-        for i in range(len(dict_of_robot_shortest_path[robot])):
+        list_of_robots = input_data['robot_id']
 
-            selected_node = dict_of_robot_shortest_path[robot][i]
-            mqtt_payload = payload(robot,selected_node)
-            client.publish("%s/robot/task"%robot, mqtt_payload)
-            print("Robot_Id: %s moving to next waypoint."%robot)
-            time.sleep(8)
+        for robot in list_of_robots:
 
-        print("One robot")
+            if dict_of_robot_shortest_path[robot] == []:
 
-    else:
+                list_of_robots.remove(robot)
+                break
 
-        while not finish:
+            selected_node = dict_of_robot_shortest_path[robot][0]
 
-            list_of_robots = input_data['robot_id']
+            if selected_node in nodes_occupied:
 
-            for robot in list_of_robots:
-
-                if dict_of_robot_shortest_path[robot] == []:
-
-                    list_of_robots.remove(robot)
-                    break
-
-                selected_node = dict_of_robot_shortest_path[robot][0]
-
-                if selected_node in nodes_occupied:
-
-                    print("Node occupied")
-                    break
-                
-                else:
-
-                    nodes_occupied.append(selected_node)
-                    mqtt_payload = payload(robot,selected_node)
-                    client.publish("%s/robot/task"%robot, mqtt_payload)
-                    print("Robot_Id: %s moving to next waypoint."%robot)
-                    robot_shortest_path = dict_of_robot_shortest_path[robot]
-                    robot_shortest_path.remove(selected_node)
-
-                time.sleep(8)
+                print("Node occupied")
+                break
             
-            if len(list_of_robots) == 0:
+            else:
 
-                print("Robots have reached their destination.")
-                finish = True
+                nodes_occupied.append(selected_node)
+                mqtt_payload = payload(robot,selected_node)
+                client.publish("%s/robot/task"%robot, mqtt_payload)
+                print("Robot_Id: %s moving to next waypoint."%robot)
+                robot_shortest_path = dict_of_robot_shortest_path[robot]
+                robot_shortest_path.remove(selected_node)
 
-            nodes_occupied.clear()
+            time.sleep(8)
+        
+        if len(list_of_robots) == 0:
+
+            print("Robots have reached their destination.")
+            finish = True
+
+        nodes_occupied.clear()
 
