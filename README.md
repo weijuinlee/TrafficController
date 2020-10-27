@@ -10,7 +10,7 @@ Clone the repo: `https://github.com/weijuinlee/TrafficController.git`
 cd TrafficController
 ```
 
-## You need three terminals running:
+## You need four terminals running:
 
 ### 1.
 ```sh
@@ -25,6 +25,11 @@ rq worker
 ### 3.
 ```sh
 python app.py
+```
+
+### 4.
+```sh
+mosquitto
 ```
 
 ## To visualise and enter waypoints into the traffic controller, you need an emulator and an editor. GOTO: https://github.com/hanscau/AngularRobotEmulator
