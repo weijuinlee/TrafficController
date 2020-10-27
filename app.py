@@ -3,8 +3,10 @@ from flask_restful import reqparse
 from flask import Flask, abort, jsonify, request
 from traffic_control_func import send_coordinates
 from redis_func import redis_conn, redis_queue
+from flask_cors import CORS
 
 app = Flask(__name__)
+cors = CORS(app)
 
 @app.errorhandler(404)
 def resource_not_found(exception):
@@ -23,4 +25,4 @@ def enqueue():
     return jsonify({"job_id": job.id})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False,host="0.0.0.0")

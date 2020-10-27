@@ -13,7 +13,7 @@ dict_of_coordinates = {}
 
 def initialization(input_data):
 
-    for robot in input_data['robot_id']:
+    for robot in input_data:
     
         URL = "https://shortestpathfinderapi.herokuapp.com/robot/%s"%robot
         r = requests.get(url = URL)
@@ -24,10 +24,6 @@ def initialization(input_data):
         dict_of_robot_shortest_path.update({robot:coordinates_of_shortest})
         robot_priority = (path_data['priority'])
         dict_of_priority.update({robot:robot_priority})
-        mqtt_payload = return_home_payload(robot)
-        client.publish("%s/robot/task"%robot, mqtt_payload)
-
-    time.sleep(12)
 
 def return_home_payload(robot):
 
@@ -82,7 +78,7 @@ def send_coordinates(input_data):
 
     while not finish:
 
-        list_of_robots = input_data['robot_id']
+        list_of_robots = input_data
 
         for robot in list_of_robots:
 
@@ -95,7 +91,6 @@ def send_coordinates(input_data):
 
             if selected_node in nodes_occupied:
 
-                print("Node occupied")
                 break
             
             else:
@@ -107,7 +102,7 @@ def send_coordinates(input_data):
                 robot_shortest_path = dict_of_robot_shortest_path[robot]
                 robot_shortest_path.remove(selected_node)
 
-            time.sleep(8)
+            time.sleep(5)
         
         if len(list_of_robots) == 0:
 
