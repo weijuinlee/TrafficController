@@ -5,13 +5,17 @@ import paho.mqtt.client as mqtt
 from ast import literal_eval
 
 broker_address="localhost"
-client = mqtt.Client("1") 
+client = mqtt.Client("TrafficController") 
 client.connect(broker_address)
 priority = {}
 robots_shortest_path = {}
 all_coordinates = {}
 
-def initialization(input_data):
+def on_message(client, userdata, message):
+    message = str(message.payload.decode("utf-8"))
+    print("received message: " ,message)
+
+def __init__(input_data):
 
     for robot in input_data:
     
@@ -24,26 +28,6 @@ def initialization(input_data):
         robots_shortest_path.update({robot:coordinates_of_shortest})
         robot_priority = (path_data['priority'])
         priority.update({robot:robot_priority})
-
-def return_home_payload(robot):
-
-    payload = '''{
-                "modificationType": "CREATE",
-                "abort": false,
-                "taskType": "GOTO",
-                "parameters": {},
-                "point": {
-                    "mapVerID": "b2a546f9-b7a1-4623-8c93-8a574b8db1f6",
-                    "positionName": "Showroom",
-                    "x": 40,
-                    "y": 700,
-                    "heading": 360
-                },
-                "totalTaskNo": 1,
-                "currTaskNo": 1
-    }'''
-
-    return payload
 
 def payload(robot,node):
 
@@ -74,7 +58,7 @@ def send_coordinates(input_data):
     finish = False
     nodes_occupied = []
 
-    initialization(input_data)
+    __init__(input_data)
 
     while not finish:
 
@@ -98,11 +82,14 @@ def send_coordinates(input_data):
                 nodes_occupied.append(selected_node)
                 mqtt_payload = payload(robot,selected_node)
                 client.publish("%s/robot/task"%robot, mqtt_payload)
+                client.loop_start()
+                client.subscribe("/robot/task/status")
+                client.on_message=on_message
+                time.sleep(10)
+                client.loop_stop()
                 print("Robot_Id: %s moving to next waypoint."%robot)
                 robot_shortest_path = robots_shortest_path[robot]
                 robot_shortest_path.remove(selected_node)
-
-            time.sleep(5)
         
         if len(list_of_robots) == 0:
 
