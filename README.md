@@ -32,7 +32,5 @@ mosquitto
 python app.py
 ```
 
-
-
-## To visualise and enter waypoints into the traffic controller, you need an emulator and an editor. GOTO: https://github.com/hanscau/AngularRobotEmulator
+### To visualise and enter waypoints into the traffic controller, you need an emulator and an editor. GOTO: https://github.com/hanscau/AngularRobotEmulator
 
