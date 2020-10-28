@@ -7,9 +7,9 @@ from ast import literal_eval
 broker_address="localhost"
 client = mqtt.Client("1") 
 client.connect(broker_address)
-dict_of_priority = {}
-dict_of_robot_shortest_path = {}
-dict_of_coordinates = {}
+priority = {}
+robots_shortest_path = {}
+all_coordinates = {}
 
 def initialization(input_data):
 
@@ -19,11 +19,11 @@ def initialization(input_data):
         r = requests.get(url = URL)
         path_data = r.json()
         coordinates = literal_eval(path_data['coordinates'])
-        dict_of_coordinates.update({robot:coordinates})
+        all_coordinates.update({robot:coordinates})
         coordinates_of_shortest = literal_eval(path_data['shortest_path'])
-        dict_of_robot_shortest_path.update({robot:coordinates_of_shortest})
+        robots_shortest_path.update({robot:coordinates_of_shortest})
         robot_priority = (path_data['priority'])
-        dict_of_priority.update({robot:robot_priority})
+        priority.update({robot:robot_priority})
 
 def return_home_payload(robot):
 
@@ -47,7 +47,7 @@ def return_home_payload(robot):
 
 def payload(robot,node):
 
-    node_coordinate = dict_of_coordinates[robot][node]
+    node_coordinate = all_coordinates[robot][node]
     x_coordinate = str(node_coordinate['x'])
     y_coordinate = str(node_coordinate['y'])
 
@@ -82,12 +82,12 @@ def send_coordinates(input_data):
 
         for robot in list_of_robots:
 
-            if dict_of_robot_shortest_path[robot] == []:
+            if robots_shortest_path[robot] == []:
 
                 list_of_robots.remove(robot)
                 break
 
-            selected_node = dict_of_robot_shortest_path[robot][0]
+            selected_node = robots_shortest_path[robot][0]
 
             if selected_node in nodes_occupied:
 
@@ -99,7 +99,7 @@ def send_coordinates(input_data):
                 mqtt_payload = payload(robot,selected_node)
                 client.publish("%s/robot/task"%robot, mqtt_payload)
                 print("Robot_Id: %s moving to next waypoint."%robot)
-                robot_shortest_path = dict_of_robot_shortest_path[robot]
+                robot_shortest_path = robots_shortest_path[robot]
                 robot_shortest_path.remove(selected_node)
 
             time.sleep(5)
