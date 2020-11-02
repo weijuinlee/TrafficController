@@ -21,7 +21,7 @@ def enqueue():
 
     if request.method == "POST":
         input_data = request.json
-        job = redis_queue.enqueue(send_coordinates,input_data)
+        job = redis_queue.enqueue(send_coordinates,input_data,job_timeout=600)
     return jsonify({"job_id": job.id})
 
 if __name__ == "__main__":

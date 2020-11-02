@@ -10,10 +10,15 @@ client.connect(broker_address)
 priority = {}
 robots_shortest_path = {}
 all_coordinates = {}
+reply_from_robot_id = 'None'
 
 def on_message(client, userdata, message):
-    message = str(message.payload.decode("utf-8"))
-    print("received message: " ,message)
+
+    global reply_from_robot_id
+    message = message.payload.decode("utf-8")
+    message = json.loads(message)
+    # print("Message from robot: %s"%message)
+    reply_from_robot_id = message['robot_id']
 
 def __init__(input_data):
 
@@ -55,6 +60,7 @@ def payload(robot,node):
 
 def send_coordinates(input_data):
 
+    global reply_from_robot_id
     finish = False
     nodes_occupied = []
 
@@ -82,12 +88,13 @@ def send_coordinates(input_data):
                 nodes_occupied.append(selected_node)
                 mqtt_payload = payload(robot,selected_node)
                 client.publish("%s/robot/task"%robot, mqtt_payload)
-                client.loop_start()
-                client.subscribe("/robot/task/status")
-                client.on_message=on_message
-                time.sleep(10)
-                client.loop_stop()
-                print("Robot_Id: %s moving to next waypoint."%robot)
+                print("Robot id: %s is moving to next waypoint."%robot)
+                while reply_from_robot_id != robot:
+                    client.subscribe("/robot/task/status")
+                    client.on_message=on_message
+                    client.loop(1)
+                print("Robot id: %s is reached waypoint."%robot)
+                reply_from_robot_id = 'None'
                 robot_shortest_path = robots_shortest_path[robot]
                 robot_shortest_path.remove(selected_node)
         
@@ -97,4 +104,3 @@ def send_coordinates(input_data):
             finish = True
 
         nodes_occupied.clear()
-
