@@ -12,13 +12,6 @@ robots_shortest_path = {}
 all_coordinates = {}
 reply_from_robot_id = ''
 
-def on_message(client, userdata, message):
-
-    global reply_from_robot_id
-    message = message.payload.decode("utf-8")
-    message = json.loads(message)
-    reply_from_robot_id = message['robot_id']
-
 def __init__(input_data):
 
     for robot in input_data:
@@ -33,11 +26,42 @@ def __init__(input_data):
         robot_priority = (path_data['priority'])
         priority.update({robot:robot_priority})
 
+def on_message(client, userdata, message):
+
+    global reply_from_robot_id
+    message = message.payload.decode("utf-8")
+    message = json.loads(message)
+    reply_from_robot_id = message['robot_id']
+
 def normal_payload(robot,node):
 
     node_coordinate = all_coordinates[robot][node]
     x_coordinate = str(node_coordinate['x'])
     y_coordinate = str(node_coordinate['y'])
+
+    payload = '''{
+                "modificationType": "CREATE",
+                "abort": false,
+                "taskType": "GOTO",
+                "parameters": {},
+                "point": {
+                    "mapVerID": "b2a546f9-b7a1-4623-8c93-8a574b8db1f6",
+                    "positionName": "Showroom",
+                    "x": %s,
+                    "y": %s,
+                    "heading": 360
+                },
+                "totalTaskNo": 1,
+                "currTaskNo": 1
+    }'''%(x_coordinate,y_coordinate)
+
+    return payload
+
+def evasive_payload(robot,node):
+
+    node_coordinate = all_coordinates[robot][node]
+    x_coordinate = str(node_coordinate['x'])
+    y_coordinate = str(node_coordinate['y']+40)
 
     payload = '''{
                 "modificationType": "CREATE",
@@ -86,8 +110,18 @@ def send_coordinates(input_data):
             if selected_node in nodes_occupied:
 
                 print("Robot id: %s is blocked."%robot)
+                mqtt_payload = evasive_payload(robot,selected_node)
+                client.publish("%s/robot/task"%robot, mqtt_payload)  
                 robot_shortest_path = robots_shortest_path[robot]
-                robot_shortest_path.remove(selected_node)                
+                robot_shortest_path.remove(selected_node)
+                print("Robot id: %s is moving to waiting point."%robot) 
+
+                while reply_from_robot_id != robot:
+
+                    client.subscribe("/robot/task/status")
+                    client.on_message=on_message
+                    client.loop(1)
+
                 break
             
             else:
@@ -98,17 +132,21 @@ def send_coordinates(input_data):
                 print("Robot id: %s is moving to next waypoint."%robot)
 
                 while reply_from_robot_id != robot:
+
                     client.subscribe("/robot/task/status")
                     client.on_message=on_message
                     client.loop(1)
 
                 print("Robot id: %s is reached waypoint."%robot)
-                reply_from_robot_id = ''
                 robot_shortest_path = robots_shortest_path[robot]
 
                 if len(robot_shortest_path) == 1:
+
                     nodes_occupied.append(selected_node)
+                    
                 robot_shortest_path.remove(selected_node)
+
+            reply_from_robot_id = ''
         
         if len(list_of_robots) == 0:
 
