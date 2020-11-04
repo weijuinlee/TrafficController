@@ -121,8 +121,8 @@ def send_coordinates(input_data):
                     client.subscribe("/robot/task/status")
                     client.on_message=on_message
                     client.loop(1)
-
-                break
+                
+                print("Robot id: %s is reached waypoint."%robot)
             
             else:
 
