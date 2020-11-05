@@ -131,7 +131,9 @@ def send_coordinates(input_data):
                 client.publish("%s/robot/task"%robot, mqtt_payload)
                 print("Robot id: %s is moving to next waypoint."%robot)
 
-                while reply_from_robot_id != robot:
+                t_end = time.time() + 5
+
+                while time.time() < t_end:
 
                     client.subscribe("/robot/task/status")
                     client.on_message=on_message
