@@ -18,7 +18,7 @@ code_red_message = ''
 def __init__(input_data):
 
     for robot in input_data:
-    
+        
         URL = "https://shortestpathfinderapi.herokuapp.com/robot/%s"%robot
         r = requests.get(url = URL)
         path_data = r.json()
