@@ -5,7 +5,7 @@ import math
 import paho.mqtt.client as mqtt
 from ast import literal_eval
 
-broker_address="localhost"
+broker_address="18.140.162.221"
 client = mqtt.Client("TrafficController") 
 client.connect(broker_address)
 robots_shortest_path = {}
@@ -13,6 +13,7 @@ all_coordinates = {}
 all_robots_position = {}
 robots_at_destinatiton = {}
 reply_from_robot_id = ''
+code_red_message = ''
 
 def __init__(input_data):
 
@@ -29,9 +30,56 @@ def __init__(input_data):
 def init_message(client, userdata, message):
 
     global reply_from_robot_id
+    global code_red_message
     message = message.payload.decode("utf-8")
     message = json.loads(message)
+    # print(message)
     reply_from_robot_id = message['robot_id']
+
+    try:
+        code_red_message = message['taskStatusType']
+
+    except:
+
+        pass
+
+def starting_position(list_of_robots):
+
+    global reply_from_robot_id
+
+    for robot in list_of_robots:
+
+        if robots_shortest_path[robot] == []:
+
+            break
+
+        selected_node = robots_shortest_path[robot][0]
+        mqtt_payload = normal_payload(robot,selected_node)
+        client.publish("%s/robot/task"%robot, mqtt_payload)
+        # current_node_used.append(selected_node)
+        robot_shortest_path = robots_shortest_path[robot]
+        robot_shortest_path.remove(selected_node)
+        print("[GOTO] %s is moving to initial waypoint."%robot)
+
+        while reply_from_robot_id != robot:
+
+            client.subscribe("%s/robot/task/status"%robot)
+            client.on_message=init_message
+            client.loop(1)
+
+        robot_shortest_path = robots_shortest_path[robot]
+        reply_from_robot_id = ''
+        print("[Notification] %s has reached initial waypoint."%robot)
+
+        t_end = time.time() + 1
+
+        while time.time() < t_end:
+
+            client.subscribe("%s/robot/status"%robot)
+            client.on_message=normal_message
+            client.loop(1)
+
+    print("[Status] All robots initialized.")
 
 def normal_message(client, userdata, message):
 
@@ -72,7 +120,6 @@ def evasive_payload(robot,node):
     node_coordinate = all_coordinates[robot][node]
     x_coordinate = str(node_coordinate['x']+20)
     y_coordinate = str(node_coordinate['y']+20)
-    print(x_coordinate,y_coordinate)
 
     payload = '''{
                 "modificationType": "CREATE",
@@ -113,45 +160,17 @@ def send_coordinates(input_data):
 
     __init__(input_data)
 
-    for robot in list_of_robots:
-
-        if robots_shortest_path[robot] == []:
-
-            break
-
-        selected_node = robots_shortest_path[robot][0]
-        mqtt_payload = normal_payload(robot,selected_node)
-        client.publish("%s/robot/task"%robot, mqtt_payload)
-        # current_node_used.append(selected_node)
-        robot_shortest_path = robots_shortest_path[robot]
-        robot_shortest_path.remove(selected_node)
-        print("[GOTO] %s is moving to initial waypoint."%robot)
-
-        while reply_from_robot_id != robot:
-
-            client.subscribe("/robot/task/status")
-            client.on_message=init_message
-            client.loop(1)
-
-        robot_shortest_path = robots_shortest_path[robot]
-        reply_from_robot_id = ''
-        print("[Status] %s has reached initial waypoint."%robot)
-
-    t_end = time.time() + 1
-
-    while time.time() < t_end:
-
-        client.subscribe("/robot/status")
-        client.on_message=normal_message
-        client.loop(1)
-
-    print("[Status] All robots initialized.")
-
+    starting_position(list_of_robots)
+    print(all_robots_position)
     while not finish:
 
         list_of_robots = input_data
 
         for robot in list_of_robots:
+
+            if code_red_message == "FAILED":
+
+                print("[Notification] Code red!!!")
 
             if robots_shortest_path[robot] == []:
 
@@ -166,10 +185,9 @@ def send_coordinates(input_data):
                 break
 
             if selected_node in robots_at_destinatiton:
-
-                print("[Notification] Robot id: %s is blocked."%robot)        
+  
                 robot_blocking = robots_at_destinatiton.get(selected_node)
-                print("robot_blocking:%s"%robot_blocking)
+                print("[Notification] Robot id: %s is blocking Robot id: %s"%(robot_blocking,robot))
 
                 mqtt_payload = evasive_payload(robot_blocking,selected_node)
                 client.publish("%s/robot/task"%robot_blocking, mqtt_payload)  
@@ -200,7 +218,7 @@ def send_coordinates(input_data):
 
                 while time.time() < t_end:
 
-                    client.subscribe("/robot/status")
+                    client.subscribe("%s/robot/status"%robot)
                     client.on_message=init_message
                     client.loop(1)
 
@@ -216,7 +234,7 @@ def send_coordinates(input_data):
 
                     while time.time() < t_end:
 
-                        client.subscribe("/robot/status")
+                        client.subscribe("%s/robot/status"%robot)
                         client.on_message=normal_message
                         client.loop(1)
 
@@ -224,11 +242,10 @@ def send_coordinates(input_data):
 
                     while time.time() < t_end:
 
-                        client.subscribe("/robot/status")
+                        client.subscribe("%s/robot/status"%robot)
                         client.on_message=normal_message
                         client.loop(1)
 
-                    print("[Status] %s is approaching waypoint."%robot)
                     robot_shortest_path = robots_shortest_path[robot]
                     robot_shortest_path.remove(selected_node)
 
@@ -239,11 +256,11 @@ def send_coordinates(input_data):
                     client.publish("%s/robot/task"%robot, mqtt_payload)
                     current_node_used.append(selected_node)
                     robot_shortest_path = robots_shortest_path[robot]
-                    print("[GOTO] %s is moving to next waypoint."%robot)
+                    print("[GOTO] Robot id: %s is moving to next waypoint."%robot)
 
                     while reply_from_robot_id != robot:
 
-                        client.subscribe("/robot/task/status")
+                        client.subscribe("%s/robot/status"%robot)
                         client.on_message=init_message
                         client.loop(1)
 
@@ -255,8 +272,6 @@ def send_coordinates(input_data):
             if len(robot_shortest_path) == 0:
 
                 robots_at_destinatiton.update({selected_node:robot})
-
-            print(robots_at_destinatiton)
 
         if len(list_of_robots) == 0:
             
