@@ -17,31 +17,30 @@ code_red_message = ''
 
 def __init__(input_data):
 
-    for robot in input_data:
-        
-        URL = "https://shortestpathfinderapi.herokuapp.com/robot/%s"%robot
-        r = requests.get(url = URL)
-        path_data = r.json()
-        coordinates = literal_eval(path_data['coordinates'])
-        all_coordinates.update({robot:coordinates})
-        coordinates_of_shortest = literal_eval(path_data['shortest_path'])
-        robots_shortest_path.update({robot:coordinates_of_shortest})
+    graph_ID = input_data['graphID']
+    URL = "https://go-pq.herokuapp.com/editor/graph/detailed/%s"%graph_ID
+    r = requests.get(url = URL)
+    graph_data = r.json()
+    list_of_verticies = []
+    vertices = graph_data['vertices']
 
-def init_message(client, userdata, message):
+    for vertice in vertices:
+        vertice = vertices.get(vertice)
+        x_coordinate = vertice.get('x')
+        y_coordinate = vertice.get('y')
+        list_of_verticies.append([x_coordinate,y_coordinate])
 
-    global reply_from_robot_id
-    global code_red_message
-    message = message.payload.decode("utf-8")
-    message = json.loads(message)
-    # print(message)
-    reply_from_robot_id = message['robot_id']
+    return list_of_verticies
 
-    try:
-        code_red_message = message['taskStatusType']
+def create_list_of_robots(input_data):
 
-    except:
+    list_of_robots = []
 
-        pass
+    for robot in input_data['robots']:
+
+        list_of_robots.append(robot['robotID'])
+
+    return list_of_robots
 
 def starting_position(list_of_robots):
 
@@ -80,6 +79,22 @@ def starting_position(list_of_robots):
             client.loop(1)
 
     print("[Status] All robots initialized.")
+
+def init_message(client, userdata, message):
+
+    global reply_from_robot_id
+    global code_red_message
+    message = message.payload.decode("utf-8")
+    message = json.loads(message)
+    # print(message)
+    reply_from_robot_id = message['robot_id']
+
+    try:
+        code_red_message = message['taskStatusType']
+
+    except:
+
+        pass
 
 def normal_message(client, userdata, message):
 
@@ -156,15 +171,16 @@ def send_coordinates(input_data):
     global reply_from_robot_id
     finish = False
     current_node_used = []
-    list_of_robots = input_data
 
-    __init__(input_data)
+    repeated = input_data['repeated']
+    list_of_vertices = __init__(input_data)
+    list_of_robots = create_list_of_robots(input_data)
+    
+    print(list_of_vertices)
+    print(list_of_robots)
+    print(repeated)
 
-    starting_position(list_of_robots)
-    print(all_robots_position)
     while not finish:
-
-        list_of_robots = input_data
 
         for robot in list_of_robots:
 
