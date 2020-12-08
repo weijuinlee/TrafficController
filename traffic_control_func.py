@@ -8,14 +8,13 @@ from ast import literal_eval
 broker_address="18.140.162.221"
 client = mqtt.Client("TrafficController") 
 client.connect(broker_address)
-robots_shortest_path = {}
-all_coordinates = {}
 all_robots_position = {}
-robots_at_destinatiton = {}
-reply_from_robot_id = ''
-code_red_message = ''
+complete_from_robot_id = None
 
-def __init__(input_data):
+def search(name, people):
+    return [element for element in people if element['name'] == name]
+
+def get_list_of_vertices(input_data, patrol_route):
 
     graph_ID = input_data['graphID']
     URL = "https://go-pq.herokuapp.com/editor/graph/detailed/%s"%graph_ID
@@ -24,8 +23,9 @@ def __init__(input_data):
     list_of_verticies = []
     vertices = graph_data['vertices']
 
-    for vertice in vertices:
-        vertice = vertices.get(vertice)
+    for waypoint in patrol_route:
+
+        vertice = vertices.get(waypoint)
         x_coordinate = vertice.get('x')
         y_coordinate = vertice.get('y')
         list_of_verticies.append([x_coordinate,y_coordinate])
@@ -42,69 +42,142 @@ def create_list_of_robots(input_data):
 
     return list_of_robots
 
-def starting_position(list_of_robots):
+def get_patrol_route(input_data):
 
-    global reply_from_robot_id
+    patrol_ID = input_data['patrolID']
+    graph_ID = input_data['graphID']
+    URL = "https://go-patrol.herokuapp.com/editor/patrol"
+    r = requests.get(url = URL)
+    graph_data = r.json()
+    searched_patrol = next((item for item in graph_data if item.get("id") == patrol_ID and item["graphID"] == graph_ID), None)
+    patrol_route = searched_patrol['points']
+
+    return patrol_route
+
+def starting_optimizer(list_of_vertices, number_of_robots, patrol_route):
+
+    while len(list_of_vertices) > number_of_robots:
+
+        list_of_total_distance = []
+        pointer = 0
+
+        for vertice in list_of_vertices:
+            
+            previous_x_coordinate = list_of_vertices[pointer - 1][0]
+            previous_y_coordinate = list_of_vertices[pointer - 1][1]
+            current_x_coordinate = list_of_vertices[pointer][0]
+            current_y_coordinate = list_of_vertices[pointer][1]
+
+            if pointer == len(list_of_vertices) - 1 :
+
+                next_x_coordinate = list_of_vertices[-1][0]
+                next_y_coordinate = list_of_vertices[-1][1]
+
+            else:
+
+                next_x_coordinate = list_of_vertices[pointer + 1][0]
+                next_y_coordinate = list_of_vertices[pointer + 1][1]
+
+            pointer = pointer + 1
+            distance_before = int(math.hypot(previous_x_coordinate - current_x_coordinate, previous_y_coordinate - current_y_coordinate))
+            distance_after = int(math.hypot(next_x_coordinate - current_x_coordinate, next_y_coordinate - current_y_coordinate))
+            list_of_total_distance.append(distance_after + distance_before)
+
+        index_of_smallest_distance = list_of_total_distance.index(min(list_of_total_distance))
+        list_of_vertices.pop(index_of_smallest_distance)
+        patrol_route.pop(index_of_smallest_distance)
+
+    return list_of_vertices
+
+def starting_payload(start_point):
+
+    payload = '''{
+                "modificationType": "CREATE",
+                "abort": false,
+                "taskType": "GOTO",
+                "parameters": {},
+                "point": {
+                    "mapVerID": "b2a546f9-b7a1-4623-8c93-8a574b8db1f6",
+                    "positionName": "Showroom",
+                    "x": %s,
+                    "y": %s,
+                    "heading": 360
+                },
+                "totalTaskNo": 1,
+                "currTaskNo": 1
+    }'''%(start_point[0],start_point[1])
+
+    return payload
+
+def complete_message(client, userdata, message):
+
+    global complete_from_robot_id
+    message = message.payload.decode("utf-8")
+    message = json.loads(message)
+    complete_from_robot_id = message['robot_id']
+
+def starting_position(list_of_robots, list_of_vertices,list_of_starting_vertices):
+
+    global complete_from_robot_id
+    global all_robots_position
 
     for robot in list_of_robots:
 
-        if robots_shortest_path[robot] == []:
+        all_robots_position.update({robot: None})
 
-            break
+    number_of_robots = len(list_of_robots)
 
-        selected_node = robots_shortest_path[robot][0]
-        mqtt_payload = normal_payload(robot,selected_node)
+    for robot in list_of_robots:
+
+        mqtt_payload = starting_payload(list_of_starting_vertices[0])
         client.publish("%s/robot/task"%robot, mqtt_payload)
-        # current_node_used.append(selected_node)
-        robot_shortest_path = robots_shortest_path[robot]
-        robot_shortest_path.remove(selected_node)
-        print("[GOTO] %s is moving to initial waypoint."%robot)
+        print("[GOTO] %s is moving to starting point."%robot)
 
-        while reply_from_robot_id != robot:
+        while complete_from_robot_id != robot:
 
             client.subscribe("%s/robot/task/status"%robot)
-            client.on_message=init_message
+            client.on_message=complete_message
             client.loop(1)
 
-        robot_shortest_path = robots_shortest_path[robot]
-        reply_from_robot_id = ''
-        print("[Notification] %s has reached initial waypoint."%robot)
+        complete_from_robot_id = None
 
-        t_end = time.time() + 1
+        list_of_starting_vertices.pop(0)
 
-        while time.time() < t_end:
+        print("[Notification] %s has reached starting point."%robot)
 
-            client.subscribe("%s/robot/status"%robot)
-            client.on_message=normal_message
-            client.loop(1)
+    print("[Status] All robots at starting positions.")
+    # current_position(list_of_robots)
 
-    print("[Status] All robots initialized.")
+    # return all_robots_position
 
-def init_message(client, userdata, message):
+    # for robot in list_of_robots:
 
-    global reply_from_robot_id
-    global code_red_message
-    message = message.payload.decode("utf-8")
-    message = json.loads(message)
-    # print(message)
-    reply_from_robot_id = message['robot_id']
+    #     mqtt_payload = normal_payload(robot,selected_node)
+    #     client.publish("%s/robot/task"%robot, mqtt_payload)
+    #     # current_node_used.append(selected_node)
+    #     robot_shortest_path = robots_shortest_path[robot]
+    #     robot_shortest_path.remove(selected_node)
+    #     print("[GOTO] %s is moving to initial waypoint."%robot)
 
-    try:
-        code_red_message = message['taskStatusType']
+    #     while complete_from_robot_id != robot:
 
-    except:
+    #         client.subscribe("%s/robot/task/status"%robot)
+    #         client.on_message=init_message
+    #         client.loop(1)
 
-        pass
+    #     robot_shortest_path = robots_shortest_path[robot]
+    #     complete_from_robot_id = ''
+    #     print("[Notification] %s has reached initial waypoint."%robot)
 
-def normal_message(client, userdata, message):
+    #     t_end = time.time() + 1
 
-    global all_robots_position
-    message = message.payload.decode("utf-8")
-    message = json.loads(message)
-    robot_id = message.get('robot_id')
-    x_coordinates = message.get('positionX')
-    y_coordinate = message.get('positionY')
-    all_robots_position[robot_id] = [x_coordinates,y_coordinate]
+    #     while time.time() < t_end:
+
+    #         client.subscribe("%s/robot/status"%robot)
+    #         client.on_message=normal_message
+    #         client.loop(1)
+
+    # print("[Status] All robots initialized.")
 
 def normal_payload(robot,node):
 
@@ -166,140 +239,136 @@ def calculate_distance(robot,node):
 
     return distance
 
-def send_coordinates(input_data):
-
-    global reply_from_robot_id
-    finish = False
-    current_node_used = []
+def patrol_task(input_data):
 
     repeated = input_data['repeated']
-    list_of_vertices = __init__(input_data)
+    patrol_route = get_patrol_route(input_data)
+    list_of_vertices = get_list_of_vertices(input_data, patrol_route)
     list_of_robots = create_list_of_robots(input_data)
-    
-    print(list_of_vertices)
-    print(list_of_robots)
-    print(repeated)
+    number_of_robots = len(list_of_robots)
+    list_of_starting_vertices = starting_optimizer(list_of_vertices,number_of_robots, patrol_route)
+    starting_position(list_of_robots, list_of_vertices, list_of_starting_vertices)
 
-    while not finish:
+    # while not finish:
 
-        for robot in list_of_robots:
+    #     for robot in list_of_robots:
 
-            if code_red_message == "FAILED":
+    #         if code_red_message == "FAILED":
 
-                print("[Notification] Code red!!!")
+    #             print("[Notification] Code red!!!")
 
-            if robots_shortest_path[robot] == []:
+    #         if robots_shortest_path[robot] == []:
 
-                list_of_robots.remove(robot)
+    #             list_of_robots.remove(robot)
 
-                break
+    #             break
 
-            selected_node = robots_shortest_path[robot][0]
+    #         selected_node = robots_shortest_path[robot][0]
 
-            if selected_node in current_node_used:
+    #         if selected_node in current_node_used:
 
-                break
+    #             break
 
-            if selected_node in robots_at_destinatiton:
+    #         if selected_node in robots_at_destinatiton:
   
-                robot_blocking = robots_at_destinatiton.get(selected_node)
-                print("[Notification] Robot id: %s is blocking Robot id: %s"%(robot_blocking,robot))
+    #             robot_blocking = robots_at_destinatiton.get(selected_node)
+    #             print("[Notification] Robot id: %s is blocking Robot id: %s"%(robot_blocking,robot))
 
-                mqtt_payload = evasive_payload(robot_blocking,selected_node)
-                client.publish("%s/robot/task"%robot_blocking, mqtt_payload)  
-                print("[Status] Robot id: %s is giving way to %s."%(robot_blocking,robot))
+    #             mqtt_payload = evasive_payload(robot_blocking,selected_node)
+    #             client.publish("%s/robot/task"%robot_blocking, mqtt_payload)  
+    #             print("[Status] Robot id: %s is giving way to %s."%(robot_blocking,robot))
 
-                time.sleep(1)
+    #             time.sleep(1)
 
-                mqtt_payload = normal_payload(robot,selected_node)
-                client.publish("%s/robot/task"%robot, mqtt_payload)
-                distance = calculate_distance(robot,selected_node)  
-                robot_shortest_path = robots_shortest_path[robot]
-                robot_shortest_path.remove(selected_node)
-                print("[Status] Robot id: %s is moving to next waypoint."%robot) 
+    #             mqtt_payload = normal_payload(robot,selected_node)
+    #             client.publish("%s/robot/task"%robot, mqtt_payload)
+    #             distance = calculate_distance(robot,selected_node)  
+    #             robot_shortest_path = robots_shortest_path[robot]
+    #             robot_shortest_path.remove(selected_node)
+    #             print("[Status] Robot id: %s is moving to next waypoint."%robot) 
 
-                t_end = time.time() + (distance/600)
+    #             t_end = time.time() + (distance/600)
 
-                while time.time() < t_end:
+    #             while time.time() < t_end:
 
-                    client.subscribe("/robot/status")
-                    client.on_message=normal_message
-                    client.loop(1)
+    #                 client.subscribe("/robot/status")
+    #                 client.on_message=normal_message
+    #                 client.loop(1)
 
-                print("[Status] Robot id: %s is reached waypoint."%robot)
+    #             print("[Status] Robot id: %s is reached waypoint."%robot)
 
-            else:
+    #         else:
 
-                t_end = time.time() + 1
+    #             t_end = time.time() + 1
 
-                while time.time() < t_end:
+    #             while time.time() < t_end:
 
-                    client.subscribe("%s/robot/status"%robot)
-                    client.on_message=init_message
-                    client.loop(1)
+    #                 client.subscribe("%s/robot/status"%robot)
+    #                 client.on_message=init_message
+    #                 client.loop(1)
 
-                if reply_from_robot_id != robot:
+    #             if complete_from_robot_id != robot:
 
-                    current_node_used.append(selected_node)
-                    mqtt_payload = normal_payload(robot,selected_node)
-                    distance = calculate_distance(robot,selected_node)
-                    client.publish("%s/robot/task"%robot, mqtt_payload)
-                    print("[Status] Robot id: %s is moving to next waypoint."%robot)
+    #                 current_node_used.append(selected_node)
+    #                 mqtt_payload = normal_payload(robot,selected_node)
+    #                 distance = calculate_distance(robot,selected_node)
+    #                 client.publish("%s/robot/task"%robot, mqtt_payload)
+    #                 print("[Status] Robot id: %s is moving to next waypoint."%robot)
 
-                    t_end = time.time() + (distance/400)
+    #                 t_end = time.time() + (distance/400)
 
-                    while time.time() < t_end:
+    #                 while time.time() < t_end:
 
-                        client.subscribe("%s/robot/status"%robot)
-                        client.on_message=normal_message
-                        client.loop(1)
+    #                     client.subscribe("%s/robot/status"%robot)
+    #                     client.on_message=normal_message
+    #                     client.loop(1)
 
-                    t_end = time.time() + 1
+    #                 t_end = time.time() + 1
 
-                    while time.time() < t_end:
+    #                 while time.time() < t_end:
 
-                        client.subscribe("%s/robot/status"%robot)
-                        client.on_message=normal_message
-                        client.loop(1)
+    #                     client.subscribe("%s/robot/status"%robot)
+    #                     client.on_message=normal_message
+    #                     client.loop(1)
 
-                    robot_shortest_path = robots_shortest_path[robot]
-                    robot_shortest_path.remove(selected_node)
+    #                 robot_shortest_path = robots_shortest_path[robot]
+    #                 robot_shortest_path.remove(selected_node)
 
-                else:
+    #             else:
 
-                    selected_node = robots_shortest_path[robot][0]
-                    mqtt_payload = normal_payload(robot,selected_node)
-                    client.publish("%s/robot/task"%robot, mqtt_payload)
-                    current_node_used.append(selected_node)
-                    robot_shortest_path = robots_shortest_path[robot]
-                    print("[GOTO] Robot id: %s is moving to next waypoint."%robot)
+    #                 selected_node = robots_shortest_path[robot][0]
+    #                 mqtt_payload = normal_payload(robot,selected_node)
+    #                 client.publish("%s/robot/task"%robot, mqtt_payload)
+    #                 current_node_used.append(selected_node)
+    #                 robot_shortest_path = robots_shortest_path[robot]
+    #                 print("[GOTO] Robot id: %s is moving to next waypoint."%robot)
 
-                    while reply_from_robot_id != robot:
+    #                 while complete_from_robot_id != robot:
 
-                        client.subscribe("%s/robot/status"%robot)
-                        client.on_message=init_message
-                        client.loop(1)
+    #                     client.subscribe("%s/robot/status"%robot)
+    #                     client.on_message=init_message
+    #                     client.loop(1)
 
-                    robot_shortest_path = robots_shortest_path[robot]
-                    robot_shortest_path.remove(selected_node)
-                    reply_from_robot_id = ''
-                    print("[Status] %s has reached next waypoint."%robot)
+    #                 robot_shortest_path = robots_shortest_path[robot]
+    #                 robot_shortest_path.remove(selected_node)
+    #                 complete_from_robot_id = ''
+    #                 print("[Status] %s has reached next waypoint."%robot)
 
-            if len(robot_shortest_path) == 0:
+    #         if len(robot_shortest_path) == 0:
 
-                robots_at_destinatiton.update({selected_node:robot})
+    #             robots_at_destinatiton.update({selected_node:robot})
 
-        if len(list_of_robots) == 0:
+    #     if len(list_of_robots) == 0:
             
-            for selected_node in robots_at_destinatiton:
+    #         for selected_node in robots_at_destinatiton:
         
-                robot = robots_at_destinatiton.get(selected_node)
-                mqtt_payload = normal_payload(robot,selected_node)
-                client.publish("%s/robot/task"%robot, mqtt_payload)  
-                print("[Status] Robot id: %s returning to their destination."%robot)
-                time.sleep(1)
+    #             robot = robots_at_destinatiton.get(selected_node)
+    #             mqtt_payload = normal_payload(robot,selected_node)
+    #             client.publish("%s/robot/task"%robot, mqtt_payload)  
+    #             print("[Status] Robot id: %s returning to their destination."%robot)
+    #             time.sleep(1)
 
-            print("[Status] Robots have reached their destination.")
-            finish = True
+    #         print("[Status] Robots have reached their destination.")
+    #         finish = True
 
-        current_node_used.clear()
+    #     current_node_used.clear()
