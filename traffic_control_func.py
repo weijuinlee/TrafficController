@@ -3,12 +3,13 @@ import time
 import json
 import math
 import paho.mqtt.client as mqtt
-from ast import literal_eval
 
 broker_address="18.140.162.221"
 client = mqtt.Client("TrafficController") 
 client.connect(broker_address)
-all_robots_position = {}
+all_robots_current_coordinates = {}
+all_robots_current_vertice = {}
+robot_planned_route = {}
 complete_from_robot_id = None
 
 def get_list_of_vertices(input_data, patrol_route):
@@ -84,7 +85,9 @@ def starting_optimizer(list_of_vertices, number_of_robots, patrol_route):
         list_of_vertices.pop(index_of_smallest_distance)
         patrol_route.pop(index_of_smallest_distance)
 
-    return list_of_vertices
+        vertice_and_coordinates = dict(zip(patrol_route, list_of_vertices))
+
+    return vertice_and_coordinates
 
 def starting_payload(start_point):
 
@@ -118,13 +121,13 @@ def localisation(robot):
 
 def localisation_message(client, userdata, message):
 
-    global all_robots_position
+    global all_robots_current_coordinates
     message = message.payload.decode("utf-8")
     message = json.loads(message)
     robot_id = message.get('robot_id')
     x_coordinates = message.get('positionX')
     y_coordinate = message.get('positionY')
-    all_robots_position[robot_id] = [x_coordinates,y_coordinate]
+    all_robots_current_coordinates[robot_id] = [x_coordinates,y_coordinate]
 
 def complete_message(client, userdata, message):
 
@@ -133,13 +136,16 @@ def complete_message(client, userdata, message):
     message = json.loads(message)
     complete_from_robot_id = message['robot_id']
 
-def starting_position(list_of_robots, list_of_vertices,list_of_starting_vertices):
+def starting_position(list_of_robots, list_of_vertices,vertices_and_coordinates):
 
     global complete_from_robot_id
+    global all_robots_current_vertice
+
+    list_of_starting_coordinates = list(vertices_and_coordinates.values())
 
     for robot in list_of_robots:
 
-        mqtt_payload = starting_payload(list_of_starting_vertices[0])
+        mqtt_payload = starting_payload(list_of_starting_coordinates[0])
         client.publish("%s/robot/task"%robot, mqtt_payload)
         print("[GOTO] %s is moving to starting point."%robot)
 
@@ -151,13 +157,19 @@ def starting_position(list_of_robots, list_of_vertices,list_of_starting_vertices
 
         complete_from_robot_id = None
 
-        list_of_starting_vertices.pop(0)
+        list_of_starting_coordinates.pop(0)
 
         print("[Notification] %s has reached starting point."%robot)
 
         localisation(robot)
 
+        list_of_starting_vertices = list(vertices_and_coordinates.keys())
+
+    all_robots_current_vertice = dict(zip(list_of_robots, list_of_starting_vertices))
+
     print("[Status] All robots at starting positions.")
+
+    return list_of_starting_vertices
 
 def normal_payload(robot,node):
 
@@ -183,48 +195,35 @@ def normal_payload(robot,node):
 
     return payload
 
-def evasive_payload(robot,node):
+def route_planning(list_of_starting_vertices, list_of_patrol_route, list_of_robots, input_data, ):
 
-    node_coordinate = all_coordinates[robot][node]
-    x_coordinate = str(node_coordinate['x']+20)
-    y_coordinate = str(node_coordinate['y']+20)
+    repeated = input_data['repeated']
 
-    payload = '''{
-                "modificationType": "CREATE",
-                "abort": false,
-                "taskType": "GOTO",
-                "parameters": {},
-                "point": {
-                    "mapVerID": "b2a546f9-b7a1-4623-8c93-8a574b8db1f6",
-                    "positionName": "Showroom",
-                    "x": %s,
-                    "y": %s,
-                    "heading": 360
-                },
-                "totalTaskNo": 1,
-                "currTaskNo": 1
-    }'''%(x_coordinate,y_coordinate)
+    st = set(list_of_starting_vertices)
+    list_of_index = [i for i, e in enumerate(list_of_patrol_route) if e in st]
 
-    return payload
+    list_of_robot_paths = []
 
-def calculate_distance(robot,node):
+    for index in list_of_index:
 
-    node_coordinate = all_coordinates[robot][node]
-    next_x_coordinate = node_coordinate['x']
-    next_y_coordinate = node_coordinate['y']
-    coordinates =  all_robots_position[robot]
-    current_x_coordinate = coordinates[0]
-    current_y_coordinate = coordinates[1]
-    distance = math.sqrt( ((next_x_coordinate + current_x_coordinate)**2) + ((next_y_coordinate + current_y_coordinate)**2) )
+        repeated_robot_path = []
+        robot_path = []
+        robot_path = list_of_patrol_route[int(index):] + list_of_patrol_route[:int(index)]
 
-    return distance
+        for _ in range(repeated):
+
+            repeated_robot_path.extend(robot_path) 
+
+        list_of_robot_paths.append(repeated_robot_path)
+    
+    robot_planned_route = dict(zip(list_of_robots, list_of_robot_paths))
 
 def patrol_task(input_data):
 
-    repeated = input_data['repeated']
-    patrol_route = get_patrol_route(input_data)
-    list_of_vertices = get_list_of_vertices(input_data, patrol_route)
+    list_of_patrol_route = get_patrol_route(input_data)
+    list_of_vertices = get_list_of_vertices(input_data, list_of_patrol_route.copy())
     list_of_robots = create_list_of_robots(input_data)
     number_of_robots = len(list_of_robots)
-    list_of_starting_vertices = starting_optimizer(list_of_vertices,number_of_robots, patrol_route)
-    starting_position(list_of_robots, list_of_vertices, list_of_starting_vertices)
+    vertices_and_coordinates = starting_optimizer(list_of_vertices, number_of_robots, list_of_patrol_route.copy())
+    list_of_starting_vertices = starting_position(list_of_robots, list_of_vertices, vertices_and_coordinates)
+    route_planning(list_of_starting_vertices, list_of_patrol_route, list_of_robots, input_data)
