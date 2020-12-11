@@ -1,4 +1,4 @@
-# flask==1.1.2
+flask==1.1.2
 # # gunicorn==20.0.4
 # # # redis==3.5.2
 # # Flask-Cors==3.0.9
@@ -10,6 +10,6 @@
 # redis==2.4.11
 # rq==0.3.4
 # Flask-Cors==3.0.9
-Flask==0.9
+# Flask==0.9
 redis==2.4.11
 rq==0.3.4
