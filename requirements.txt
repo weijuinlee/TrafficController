@@ -1,11 +1,12 @@
 Flask==1.1.2
 gunicorn==20.0.4
-# # redis==3.5.2
 Flask-Cors==3.0.9
 Flask-RESTful==0.3.8
 flask-mqtt==1.1.1
 redis>=3
 rq>=0.13
+
+# # redis==3.5.2
 # Flask==0.9
 # redis==2.4.11
 # rq==0.3.4
