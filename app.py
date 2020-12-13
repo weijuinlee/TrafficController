@@ -92,6 +92,7 @@ import json
 from flask import Flask
 # from flask import render_template
 from flask import request
+from flask_cors import CORS
 
 from rq import Queue
 from rq.job import Job
@@ -103,6 +104,8 @@ from traffic_control_func import patrol_task
 
 q = Queue(connection=conn)
 app = Flask(__name__)
+cors = CORS(app)
+
 # word_counter = WordCounter()
 
 @app.route('/')
