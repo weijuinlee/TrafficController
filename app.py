@@ -6,6 +6,10 @@ from flask_cors import CORS
 app = Flask(__name__)
 cors = CORS(app)
 
+@app.route('/')
+def main():
+    return "App is running!"
+
 @app.route('/schedule/task', methods=['POST'])
 def create_task():
     if not request.json:
