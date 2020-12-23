@@ -20,7 +20,7 @@ complete_from_robot_id = None
 def get_list_of_vertices(input_data, patrol_route):
 
     graph_ID = input_data['graphID']
-    URL = "https://go-pq.herokuapp.com/editor/graph/detailed/%s"%graph_ID
+    URL = "https://go-patrol.herokuapp.com/editor/graph/detailed/%s"%graph_ID
     r = requests.get(url = URL)
     graph_data = r.json()
     list_of_verticies = []
@@ -56,14 +56,18 @@ def get_patrol_route(input_data):
     patrol_route = searched_patrol['points']
     return patrol_route
 
-def initialisation(input_data):
+def initialisation(input_data, list_of_vertices):
 
     graph_ID = input_data['graphID']
-    URL = "https://go-pq.herokuapp.com/editor/graph/detailed/%s"%graph_ID
+    # print(list_of_patrol_route)
+    URL = "https://go-patrol.herokuapp.com/editor/graph/detailed/%s"%graph_ID
     r = requests.get(url = URL)
     graph_data = r.json()
     vertices = graph_data['vertices']
-    list_of_vertices = list(vertices.keys())
+    # print(vertices)
+    # list_of_vertices = list(vertices.keys())
+    # print(list_of_vertices)
+
     coordinates_of_verticies = []
 
     for vertice in list_of_vertices:
@@ -78,23 +82,17 @@ def initialisation(input_data):
 
 def starting_optimizer(all_vertices_and_coordinates, number_of_robots, patrol_route):
 
-    # print(all_vertices_and_coordinates)
     list_of_vertices = list(all_vertices_and_coordinates.values())
-    # print(list_of_vertices)
+
     X = np.array(list_of_vertices)
     plt.scatter(X[:,0],X[:,1], label='True Position')
-    # plt.show()
     kmeans = KMeans(n_clusters=number_of_robots)
     kmeans.fit(X)
-    # print(kmeans.cluster_centers_)
-    # print(list_of_vertices)
-    # all_shortest_vertice_and_coordinate = {}
     list_of_starting_vertices = []
 
     for center in kmeans.cluster_centers_:
 
         shortest_distance = 99999
-        # current_list = list_of_vertices
 
         for vertice in all_vertices_and_coordinates:
 
@@ -103,74 +101,16 @@ def starting_optimizer(all_vertices_and_coordinates, number_of_robots, patrol_ro
             # print(vertice_coordinates)
             distance = int(math.hypot(center[0] - vertice_coordinates[0], center[1] - vertice_coordinates[1]))
 
-            # print(distance)
-            # print(shortest_distance)
-
             if distance < shortest_distance:
 
                 shortest_distance = distance
                 shortest_distance_vertice = vertice
-                # del all_vertices_and_coordinates[vertice]
-
-        # print(shortest_distance_vertice)
-        # print(all_vertices_and_coordinates.items())
-        # del all_vertices_and_coordinates[shortest_distance_vertice]
-        # print(shortest_distance_vertice)
-        # print(all_vertices_and_coordinates)
 
         list_of_starting_vertices.append(shortest_distance_vertice)
-        # print(list_of_starting_vertices)
-        # vertice_coordinates = all_vertices_and_coordinates
-        # all_shortest_vertice_and_coordinate.update( shortest_distance_vertice = all_vertices_and_coordinates[vertice])
-    
-    all_shortest_vertice_and_coordinate = {x: all_vertices_and_coordinates[x] for x in list_of_starting_vertices}
-    # print(all_shortest_vertice_and_coordinate)
-    # print(all_shortest_vertice_and_coordinate)
-    # vertice_and_coordinates = dict(zip(patrol_route, list_of_shortest_distance_coordinates))
 
-    print(all_shortest_vertice_and_coordinate)
+    all_shortest_vertice_and_coordinate = {x: all_vertices_and_coordinates[x] for x in list_of_starting_vertices}
 
     return all_shortest_vertice_and_coordinate
-
-# def starting_optimizer(list_of_vertices, number_of_robots, patrol_route):
-
-#     while len(list_of_vertices) > number_of_robots:
-
-#         print(len(list_of_vertices))
-
-#         list_of_total_distance = []
-#         pointer = 0
-
-#         for vertice in list_of_vertices:
-            
-#             previous_x_coordinate = list_of_vertices[pointer - 1][0]
-#             previous_y_coordinate = list_of_vertices[pointer - 1][1]
-#             current_x_coordinate = list_of_vertices[pointer][0]
-#             current_y_coordinate = list_of_vertices[pointer][1]
-
-#             if pointer == len(list_of_vertices) - 1 :
-
-#                 next_x_coordinate = list_of_vertices[-1][0]
-#                 next_y_coordinate = list_of_vertices[-1][1]
-
-#             else:
-
-#                 next_x_coordinate = list_of_vertices[pointer + 1][0]
-#                 next_y_coordinate = list_of_vertices[pointer + 1][1]
-
-#             pointer = pointer + 1
-#             print(pointer)
-#             distance_before = int(math.hypot(previous_x_coordinate - current_x_coordinate, previous_y_coordinate - current_y_coordinate))
-#             distance_after = int(math.hypot(next_x_coordinate - current_x_coordinate, next_y_coordinate - current_y_coordinate))
-#             list_of_total_distance.append(distance_after + distance_before)
-
-#         index_of_smallest_distance = list_of_total_distance.index(min(list_of_total_distance))
-#         list_of_vertices.pop(index_of_smallest_distance)
-#         patrol_route.pop(index_of_smallest_distance)
-
-#         vertice_and_coordinates = dict(zip(patrol_route, list_of_vertices))
-
-#     return vertice_and_coordinates
 
 def starting_payload(start_point):
 
@@ -241,18 +181,47 @@ def complete_message(client, userdata, message):
 
 def starting_position(list_of_robots,vertices_and_coordinates):
 
+    for robot in list_of_robots:
+
+        localisation(robot)
+
+    list_of_starting_vertices = list(vertices_and_coordinates.keys())
+
     global complete_from_robot_id
     global all_robots_current_vertice
+    global all_robots_current_coordinates
+    starting_vertices = {}
+    starting_coordinates = {}
 
-    # print(vertices_and_coordinates)
-
-    list_of_starting_coordinates = list(vertices_and_coordinates.values())
+    list_of_distance = []
 
     for robot in list_of_robots:
 
-        # list_of_starting_coordinates = list(vertices_and_coordinates.values())
-        # print(list_of_starting_coordinates)
-        mqtt_payload = starting_payload(list_of_starting_coordinates[0])
+        current_coordinate = all_robots_current_coordinates[robot]
+
+        for vertice, start_coordinates in vertices_and_coordinates.items():
+
+            distance = math.sqrt( ((current_coordinate[0]-start_coordinates[0])**2)+((current_coordinate[1]-start_coordinates[1])**2) )
+            vertice_distance = [distance, robot, vertice]
+            list_of_distance.append(vertice_distance)
+
+    list_of_distance.sort(key = lambda list_of_distance: list_of_distance[0]) 
+
+    for distance in list_of_distance:
+
+        if distance[1] in list_of_robots and distance[2] in list_of_starting_vertices:
+
+            starting_vertices[distance[1]] = distance[2] 
+            list_of_robots.remove(distance[1])
+            list_of_starting_vertices.remove(distance[2])
+
+    for robot, vertice in starting_vertices.items():
+
+        starting_coordinates[robot] = vertices_and_coordinates[vertice]
+
+    for robot, coordinate in starting_coordinates.items():
+
+        mqtt_payload = starting_payload(coordinate)
         client.publish("%s/robot/task"%robot, mqtt_payload)
         print("[GOTO] %s is moving to starting point."%robot)
 
@@ -264,35 +233,30 @@ def starting_position(list_of_robots,vertices_and_coordinates):
 
         complete_from_robot_id = None
 
-        list_of_starting_coordinates.pop(0)
-
         print("[Notification] %s has reached starting point."%robot)
 
         localisation(robot)
 
-        list_of_starting_vertices = list(vertices_and_coordinates.keys())
-        # print(list_of_starting_vertices)
-
-    all_robots_current_vertice = dict(zip(list_of_robots, list_of_starting_vertices))
-
     print("[Status] All robots at starting positions.")
-    # print(list_of_starting_vertices)
-    # print(all_robots_current_coordinates)
 
-    return list_of_starting_vertices
+    all_robots_current_vertice = starting_vertices
+  
+    print(all_robots_current_vertice)
 
-def route_planning(list_of_starting_vertices, list_of_patrol_route, list_of_robots, input_data, ):
+    return starting_vertices
+
+def route_planning(starting_vertices, patrol_route, input_data):
+
+    robots_planned_route = {}
 
     number_of_loop = input_data['numberOfLoop']
-    st = set(list_of_starting_vertices)
-    list_of_index = [i for i, e in enumerate(list_of_patrol_route) if e in st]
-    list_of_robot_paths = []
 
-    for index in list_of_index:
+    for robot, vertice in starting_vertices.items():
 
+        index = patrol_route.index(vertice)
         repeated_robot_path = []
         robot_path = []
-        robot_path = list_of_patrol_route[int(index):] + list_of_patrol_route[:int(index)]
+        robot_path = patrol_route[int(index):] + patrol_route[:int(index)]
 
         if number_of_loop == 1:
 
@@ -305,9 +269,7 @@ def route_planning(list_of_starting_vertices, list_of_patrol_route, list_of_robo
                 repeated_robot_path.extend(robot_path) 
 
         repeated_robot_path.pop(0)
-        list_of_robot_paths.append(repeated_robot_path)
-
-    robots_planned_route = dict(zip(list_of_robots, list_of_robot_paths))
+        robots_planned_route[robot] = repeated_robot_path
 
     return robots_planned_route
 
@@ -336,21 +298,21 @@ def patrol_task(input_data):
     global complete_from_robot_id
     global all_robots_current_vertice
     global current_node_used
+
     complete_from_robot_id = None
-    all_vertices_and_coordinates = initialisation(input_data)
     list_of_patrol_route = get_patrol_route(input_data)
+    all_vertices_and_coordinates = initialisation(input_data, list_of_patrol_route)
     list_of_vertices = get_list_of_vertices(input_data, list_of_patrol_route.copy())
     list_of_robots = create_list_of_robots(input_data)
     number_of_robots = len(list_of_robots)
     starting_vertices_and_coordinates = starting_optimizer(all_vertices_and_coordinates, number_of_robots, list_of_patrol_route.copy())
-    # print(starting_vertices_and_coordinates)
-    list_of_starting_vertices = starting_position(list_of_robots, starting_vertices_and_coordinates)
-    # print(list_of_starting_vertices)
-    robots_planned_route = route_planning(list_of_starting_vertices, list_of_patrol_route, list_of_robots, input_data)
-    current_node_used = list_of_starting_vertices
+    starting_vertices = starting_position(list_of_robots, starting_vertices_and_coordinates)
+    robots_planned_route = route_planning(starting_vertices, list_of_patrol_route, input_data)
+    current_node_used = list(starting_vertices.values())
+    list_of_robots = create_list_of_robots(input_data)
 
     finish = False
-    
+
     while not finish:
 
         for robot in random.sample(list_of_robots,len(list_of_robots)):
@@ -376,4 +338,6 @@ def patrol_task(input_data):
         if len(list_of_robots) == 0:
 
             finish = True
+        
+        print(robots_planned_route)
     
