@@ -59,14 +59,10 @@ def get_patrol_route(input_data):
 def initialisation(input_data, list_of_vertices):
 
     graph_ID = input_data['graphID']
-    # print(list_of_patrol_route)
     URL = "https://go-patrol.herokuapp.com/editor/graph/detailed/%s"%graph_ID
     r = requests.get(url = URL)
     graph_data = r.json()
     vertices = graph_data['vertices']
-    # print(vertices)
-    # list_of_vertices = list(vertices.keys())
-    # print(list_of_vertices)
 
     coordinates_of_verticies = []
 
@@ -240,8 +236,6 @@ def starting_position(list_of_robots,vertices_and_coordinates):
     print("[Status] All robots at starting positions.")
 
     all_robots_current_vertice = starting_vertices
-  
-    print(all_robots_current_vertice)
 
     return starting_vertices
 
