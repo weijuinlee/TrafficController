@@ -17,67 +17,75 @@ robots_planned_route = {}
 current_node_used = []
 complete_from_robot_id = None
 
-def get_list_of_vertices(input_data, patrol_route):
-
-    graph_ID = input_data['graphID']
-    URL = "https://go-patrol.herokuapp.com/editor/graph/detailed/%s"%graph_ID
-    r = requests.get(url = URL)
-    graph_data = r.json()
-    list_of_verticies = []
-    vertices = graph_data['vertices']
-
-    for waypoint in patrol_route:
-
-        vertice = vertices.get(waypoint)
-        x_coordinate = vertice.get('x')
-        y_coordinate = vertice.get('y')
-        list_of_verticies.append([x_coordinate,y_coordinate])
-
-    return list_of_verticies
-
 def create_list_of_robots(input_data):
 
     list_of_robots = []
+    # print(input_data)
+    for task in input_data:
+        # print(task)
+        task = task['taskDetails']
 
-    for robot in input_data['robots']:
+        for robot in task['robots']:
 
-        list_of_robots.append(robot['robotID'])
+            list_of_robots.append(robot['robotID'])
 
+    # print(list_of_robots)
     return list_of_robots
 
 def get_patrol_route(input_data):
 
-    patrol_ID = input_data['patrolID']
-    graph_ID = input_data['graphID']
-    URL = "https://go-patrol.herokuapp.com/editor/patrol"
-    r = requests.get(url = URL)
-    graph_data = r.json()
-    searched_patrol = next((item for item in graph_data if item.get("id") == patrol_ID and item["graphID"] == graph_ID), None)
-    patrol_route = searched_patrol['points']
+    patrol_route = []
+    # print(input_data)
+    for task in input_data:
+        # print(task)
+        task = task['taskDetails']
+        patrol_ID = task['patrolID']
+        graph_ID = task['graphID']
+        URL = "https://go-patrol.herokuapp.com/editor/patrol"
+        r = requests.get(url = URL)
+        graph_data = r.json()
+        searched_patrol = next((item for item in graph_data if item.get("id") == patrol_ID and item["graphID"] == graph_ID), None)
+        patrol_route.append(searched_patrol['points'])
+    
+    # print(patrol_route)
     return patrol_route
 
-def initialisation(input_data, list_of_vertices):
+def initialisation(input_data, list_of_patrol_route):
 
-    graph_ID = input_data['graphID']
-    URL = "https://go-patrol.herokuapp.com/editor/graph/detailed/%s"%graph_ID
-    r = requests.get(url = URL)
-    graph_data = r.json()
-    vertices = graph_data['vertices']
+    # print(input_data)
+    # print(list_of_patrol_route)
+    all_vertices_and_coordinates = {}
+    for i, task in enumerate(input_data):
+        # print(task)
+        task = task['taskDetails']
+        graph_ID = task['graphID']
+        URL = "https://go-patrol.herokuapp.com/editor/graph/detailed/%s"%graph_ID
+        r = requests.get(url = URL)
+        graph_data = r.json()
+        vertices = graph_data['vertices']
+        # print(vertices)
+        list_of_vertices = list_of_patrol_route[i]
+        # print(list_of_vertices)
+        coordinates_of_verticies = []
 
-    coordinates_of_verticies = []
+        for vertice in list_of_vertices:
+            # print(vertice)
+            x_coordinate = vertices[vertice].get('x')
+            y_coordinate = vertices[vertice].get('y')
+            coordinates_of_verticies.append([x_coordinate,y_coordinate])
 
-    for vertice in list_of_vertices:
+        vertices_and_coordinates = dict(zip(list_of_vertices, coordinates_of_verticies))
+        
+        all_vertices_and_coordinates.update(vertices_and_coordinates)
+        # print(all_vertices_and_coordinates)
 
-        x_coordinate = vertices[vertice].get('x')
-        y_coordinate = vertices[vertice].get('y')
-        coordinates_of_verticies.append([x_coordinate,y_coordinate])
-
-    all_vertices_and_coordinates = dict(zip(list_of_vertices, coordinates_of_verticies))
-
+    # print(all_vertices_and_coordinates)
     return all_vertices_and_coordinates
 
-def starting_optimizer(all_vertices_and_coordinates, number_of_robots, patrol_route):
-
+def starting_optimizer(all_vertices_and_coordinates, number_of_robots):
+    # print(patrol_route)
+    # print(all_vertices_and_coordinates)
+    # print(number_of_robots)
     list_of_vertices = list(all_vertices_and_coordinates.values())
 
     X = np.array(list_of_vertices)
@@ -105,7 +113,7 @@ def starting_optimizer(all_vertices_and_coordinates, number_of_robots, patrol_ro
         list_of_starting_vertices.append(shortest_distance_vertice)
 
     all_shortest_vertice_and_coordinate = {x: all_vertices_and_coordinates[x] for x in list_of_starting_vertices}
-
+    # print(all_shortest_vertice_and_coordinate)
     return all_shortest_vertice_and_coordinate
 
 def starting_payload(start_point):
@@ -197,7 +205,7 @@ def starting_position(list_of_robots,vertices_and_coordinates):
 
         for vertice, start_coordinates in vertices_and_coordinates.items():
 
-            distance = math.sqrt( ((current_coordinate[0]-start_coordinates[0])**2)+((current_coordinate[1]-start_coordinates[1])**2) )
+            distance = math.sqrt(int( ((current_coordinate[0]-start_coordinates[0])**2)+((current_coordinate[1]-start_coordinates[1])**2) ))
             vertice_distance = [distance, robot, vertice]
             list_of_distance.append(vertice_distance)
 
@@ -236,36 +244,50 @@ def starting_position(list_of_robots,vertices_and_coordinates):
     print("[Status] All robots at starting positions.")
 
     all_robots_current_vertice = starting_vertices
-
+    # print(starting_vertices)
     return starting_vertices
 
-def route_planning(starting_vertices, patrol_route, input_data):
+def route_planning(starting_vertices, list_of_patrol_route, input_data):
+
+    # print(starting_vertices)
+    # print(list_of_patrol_route)
+    # print(input_data)
 
     robots_planned_route = {}
 
-    number_of_loop = input_data['numberOfLoop']
+    for i, task in enumerate(input_data):
+    # for task in input_data:
+        # print(task)
+        task = task['taskDetails']
+        # print(task)
+        number_of_loop = task['numberOfLoop']
 
-    for robot, vertice in starting_vertices.items():
+        for robot, vertice in starting_vertices.items():
 
-        index = patrol_route.index(vertice)
-        repeated_robot_path = []
-        robot_path = []
-        robot_path = patrol_route[int(index):] + patrol_route[:int(index)]
+            for patrol_route in list_of_patrol_route:
 
-        if number_of_loop == 1:
+                if vertice in patrol_route:
 
-            repeated_robot_path = robot_path
+                    index = patrol_route.index(vertice)
+                    # print(index)
+                    repeated_robot_path = []
+                    robot_path = []
+                    robot_path = patrol_route[int(index):] + patrol_route[:int(index)]
 
-        else:
-                
-            for _ in range(number_of_loop):
+                    if number_of_loop == 1:
 
-                repeated_robot_path.extend(robot_path) 
+                        repeated_robot_path = robot_path
 
-        repeated_robot_path.pop(0)
-        robots_planned_route[robot] = repeated_robot_path
+                    else:
+                            
+                        for _ in range(number_of_loop):
 
-    return robots_planned_route
+                            repeated_robot_path.extend(robot_path) 
+
+                    repeated_robot_path.pop(0)
+                    robots_planned_route[robot] = repeated_robot_path
+
+        return robots_planned_route
 
 def go_to(vertice, robot, all_vertices_and_coordinates):
 
@@ -295,12 +317,21 @@ def patrol_task(input_data):
 
     complete_from_robot_id = None
     list_of_patrol_route = get_patrol_route(input_data)
+    # print(list_of_patrol_route)
+    # for patrol_route in list_of_patrol_route:
     all_vertices_and_coordinates = initialisation(input_data, list_of_patrol_route)
-    list_of_vertices = get_list_of_vertices(input_data, list_of_patrol_route.copy())
+    # all_vertices_and_coordinates = initialisation(input_data, list_of_patrol_route)
+    # list_of_vertices = get_list_of_vertices(input_data, list_of_patrol_route.copy())
+    # print(all_vertices_and_coordinates)
+    # for task in input_data:
     list_of_robots = create_list_of_robots(input_data)
+    # print(list_of_robots)
     number_of_robots = len(list_of_robots)
-    starting_vertices_and_coordinates = starting_optimizer(all_vertices_and_coordinates, number_of_robots, list_of_patrol_route.copy())
+    # print(list_of_patrol_route)
+    starting_vertices_and_coordinates = starting_optimizer(all_vertices_and_coordinates, number_of_robots)
+    # print(starting_vertices_and_coordinates)
     starting_vertices = starting_position(list_of_robots, starting_vertices_and_coordinates)
+    # print(starting_vertices)
     robots_planned_route = route_planning(starting_vertices, list_of_patrol_route, input_data)
     current_node_used = list(starting_vertices.values())
     list_of_robots = create_list_of_robots(input_data)

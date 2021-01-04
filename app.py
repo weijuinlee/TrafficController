@@ -15,7 +15,7 @@ def create_task():
     if not request.json:
         about(400)
     data = request.json
-    patrol_task(data["taskDetails"])
+    patrol_task(data)
     return "Task completed."
 
 @app.errorhandler(404)
