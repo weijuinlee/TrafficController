@@ -32,20 +32,48 @@ def create_list_of_robots(input_data):
     # print(list_of_robots)
     return list_of_robots
 
+def create_group_of_robots(input_data):
+    # print(input_data)
+    group_of_robots = []
+
+    # print(input_data)
+    for task in input_data:
+        # print(task)
+        task = task['taskDetails']
+        robot_task = task['robots']
+        # print(robot_task)
+        list_of_robots = []
+
+        for robot in robot_task:
+
+            list_of_robots.append(robot['robotID'])
+            # print(list_of_robots)
+
+        group_of_robots.append(list_of_robots)
+
+        # print(group_of_robots)
+
+    return group_of_robots
+
 def get_patrol_route(input_data):
 
-    patrol_route = []
+    patrol_route = {}
     # print(input_data)
     for task in input_data:
         # print(task)
         task = task['taskDetails']
         patrol_ID = task['patrolID']
         graph_ID = task['graphID']
+        robots = task['robots']
         URL = "https://go-patrol.herokuapp.com/editor/patrol"
         r = requests.get(url = URL)
         graph_data = r.json()
         searched_patrol = next((item for item in graph_data if item.get("id") == patrol_ID and item["graphID"] == graph_ID), None)
-        patrol_route.append(searched_patrol['points'])
+        # patrol_route.append(searched_patrol['points'])
+        # print(robots)
+        for robot in robots:
+
+            patrol_route[robot['robotID']] = (searched_patrol['points'])
     
     # print(patrol_route)
     return patrol_route
@@ -53,7 +81,7 @@ def get_patrol_route(input_data):
 def initialisation(input_data, list_of_patrol_route):
 
     # print(input_data)
-    # print(list_of_patrol_route)
+    # print(patrol_route)
     all_vertices_and_coordinates = {}
     for i, task in enumerate(input_data):
         # print(task)
@@ -183,75 +211,107 @@ def complete_message(client, userdata, message):
     message = json.loads(message)
     complete_from_robot_id = message['robot_id']
 
-def starting_position(list_of_robots,vertices_and_coordinates):
+def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,patrol_route):
 
-    for robot in list_of_robots:
-
-        localisation(robot)
-
-    list_of_starting_vertices = list(vertices_and_coordinates.keys())
-
+    # print(group_of_robots)
+    # print(list_of_robots)
+    # print(patrol_route)
     global complete_from_robot_id
     global all_robots_current_vertice
     global all_robots_current_coordinates
-    starting_vertices = {}
     starting_coordinates = {}
+    distance_groups = []
+    # print(vertices_and_coordinates)
+    for list_of_robots in group_of_robots:
 
-    list_of_distance = []
+        for robot in list_of_robots:
 
-    for robot in list_of_robots:
+            localisation(robot)
 
-        current_coordinate = all_robots_current_coordinates[robot]
+        list_of_starting_vertices = list(vertices_and_coordinates.keys())
 
-        for vertice, start_coordinates in vertices_and_coordinates.items():
+        list_of_distance = []
 
-            distance = math.sqrt(int( ((current_coordinate[0]-start_coordinates[0])**2)+((current_coordinate[1]-start_coordinates[1])**2) ))
-            vertice_distance = [distance, robot, vertice]
-            list_of_distance.append(vertice_distance)
+        for robot in list_of_robots:
 
-    list_of_distance.sort(key = lambda list_of_distance: list_of_distance[0]) 
+            current_coordinate = all_robots_current_coordinates[robot]
 
-    for distance in list_of_distance:
+            for vertice, start_coordinates in vertices_and_coordinates.items():
 
-        if distance[1] in list_of_robots and distance[2] in list_of_starting_vertices:
+                distance = math.sqrt(int( ((current_coordinate[0]-start_coordinates[0])**2)+((current_coordinate[1]-start_coordinates[1])**2) ))
+                vertice_distance = [distance, robot, vertice]
+                list_of_distance.append(vertice_distance)
 
-            starting_vertices[distance[1]] = distance[2] 
-            list_of_robots.remove(distance[1])
-            list_of_starting_vertices.remove(distance[2])
+        list_of_distance.sort(key = lambda list_of_distance: list_of_distance[0]) 
+        distance_groups.append(list_of_distance)
 
-    for robot, vertice in starting_vertices.items():
+    # print(distance_groups)
+        # print(list_of_distance)
+        # print(patrol_route)
+        # print(list_of_robots)
+        # print(list_of_starting_vertices)
+        # print(starting_vertices)
+        # print(starting_coordinates)
+    starting_vertices = {}
 
-        starting_coordinates[robot] = vertices_and_coordinates[vertice]
+    for i, list_of_robots in enumerate(group_of_robots):
+        # print(list_of_robots)
+        for list_of_distance in distance_groups:
+            # print(list_of_distance)
+            for distance in list_of_distance:
+        # while len(list_of_distance) > 0:
+                # print(list_of_robots)
+                # print(distance[1])
+                # print(distance[2])
+                # print(group_of_robots[i])
+                # print(group_of_robots)
+                # print(list_of_starting_vertices)
+                if distance[1] in list_of_robots and distance[2] in list_of_starting_vertices and distance[2] in patrol_route[distance[1]]:
+    #  and distance[2] in patrol_route[distance[1]]
+                    # print(distance)
+                    # print(list_of_starting_vertices)
+                    # print(list_of_robots)
+                    starting_vertices[distance[1]] = distance[2] 
+                    list_of_robots.remove(distance[1])
+                    list_of_starting_vertices.remove(distance[2])
+                
+                print(starting_vertices)
 
-    for robot, coordinate in starting_coordinates.items():
+        for robot, vertice in starting_vertices.items():
 
-        mqtt_payload = starting_payload(coordinate)
-        client.publish("%s/robot/task"%robot, mqtt_payload)
-        print("[GOTO] %s is moving to starting point."%robot)
+            starting_coordinates[robot] = vertices_and_coordinates[vertice]
 
-        while complete_from_robot_id != robot:
+        for robot, coordinate in starting_coordinates.items():
 
-            client.subscribe("%s/robot/task/status"%robot)
-            client.on_message=complete_message
-            client.loop(1)
+            mqtt_payload = starting_payload(coordinate)
+            client.publish("%s/robot/task"%robot, mqtt_payload)
+            print("[GOTO] %s is moving to starting point."%robot)
 
-        complete_from_robot_id = None
+            while complete_from_robot_id != robot:
 
-        print("[Notification] %s has reached starting point."%robot)
+                client.subscribe("%s/robot/task/status"%robot)
+                client.on_message=complete_message
+                client.loop(1)
 
-        localisation(robot)
+            complete_from_robot_id = None
 
+            print("[Notification] %s has reached starting point."%robot)
+
+            localisation(robot)
+
+    time.sleep(10)
     print("[Status] All robots at starting positions.")
 
     all_robots_current_vertice = starting_vertices
+
     # print(starting_vertices)
     return starting_vertices
 
-def route_planning(starting_vertices, list_of_patrol_route, input_data):
+def route_planning(starting_vertices, patrol_route, input_data):
 
-    # print(starting_vertices)
-    # print(list_of_patrol_route)
-    # print(input_data)
+    print(starting_vertices)
+    print(patrol_route)
+    print(input_data)
 
     robots_planned_route = {}
 
@@ -261,31 +321,30 @@ def route_planning(starting_vertices, list_of_patrol_route, input_data):
         task = task['taskDetails']
         # print(task)
         number_of_loop = task['numberOfLoop']
+        print(patrol_route)
+        for robot, vertices in patrol_route.items():
+        # for patrol_route in list_of_patrol_route:
+            # for robot, vertice in starting_vertices.items():
 
-        for robot, vertice in starting_vertices.items():
+                # if vertice in patrol_route:
+            index = vertices.index(starting_vertices[robot])
+            print(index)
+            repeated_robot_path = []
+            robot_path = []
+            robot_path = vertices[int(index):] + vertices[:int(index)]
 
-            for patrol_route in list_of_patrol_route:
+            if number_of_loop == 1:
 
-                if vertice in patrol_route:
+                repeated_robot_path = robot_path
 
-                    index = patrol_route.index(vertice)
-                    # print(index)
-                    repeated_robot_path = []
-                    robot_path = []
-                    robot_path = patrol_route[int(index):] + patrol_route[:int(index)]
+            else:
+                    
+                for _ in range(number_of_loop):
 
-                    if number_of_loop == 1:
+                    repeated_robot_path.extend(robot_path) 
 
-                        repeated_robot_path = robot_path
-
-                    else:
-                            
-                        for _ in range(number_of_loop):
-
-                            repeated_robot_path.extend(robot_path) 
-
-                    repeated_robot_path.pop(0)
-                    robots_planned_route[robot] = repeated_robot_path
+            repeated_robot_path.pop(0)
+            robots_planned_route[robot] = repeated_robot_path
 
         return robots_planned_route
 
@@ -309,6 +368,24 @@ def go_to(vertice, robot, all_vertices_and_coordinates):
 
     localisation(robot)
 
+def get_patrol_route_list(input_data):
+
+    patrol_route = []
+    # print(input_data)
+    for task in input_data:
+        # print(task)
+        task = task['taskDetails']
+        patrol_ID = task['patrolID']
+        graph_ID = task['graphID']
+        URL = "https://go-patrol.herokuapp.com/editor/patrol"
+        r = requests.get(url = URL)
+        graph_data = r.json()
+        searched_patrol = next((item for item in graph_data if item.get("id") == patrol_ID and item["graphID"] == graph_ID), None)
+        patrol_route.append(searched_patrol['points'])
+    
+    # print(patrol_route)
+    return patrol_route
+
 def patrol_task(input_data):
 
     global complete_from_robot_id
@@ -316,7 +393,9 @@ def patrol_task(input_data):
     global current_node_used
 
     complete_from_robot_id = None
-    list_of_patrol_route = get_patrol_route(input_data)
+    patrol_route = get_patrol_route(input_data)
+    # print(patrol_route)
+    list_of_patrol_route = get_patrol_route_list(input_data)
     # print(list_of_patrol_route)
     # for patrol_route in list_of_patrol_route:
     all_vertices_and_coordinates = initialisation(input_data, list_of_patrol_route)
@@ -325,14 +404,16 @@ def patrol_task(input_data):
     # print(all_vertices_and_coordinates)
     # for task in input_data:
     list_of_robots = create_list_of_robots(input_data)
+    group_of_robots = create_group_of_robots(input_data)
     # print(list_of_robots)
     number_of_robots = len(list_of_robots)
     # print(list_of_patrol_route)
     starting_vertices_and_coordinates = starting_optimizer(all_vertices_and_coordinates, number_of_robots)
     # print(starting_vertices_and_coordinates)
-    starting_vertices = starting_position(list_of_robots, starting_vertices_and_coordinates)
+    # robots_patrol_route = bind_robots_to_patrol(input_data)
+    starting_vertices = starting_position(group_of_robots,list_of_robots, starting_vertices_and_coordinates, patrol_route)
     # print(starting_vertices)
-    robots_planned_route = route_planning(starting_vertices, list_of_patrol_route, input_data)
+    robots_planned_route = route_planning(starting_vertices, patrol_route, input_data)
     current_node_used = list(starting_vertices.values())
     list_of_robots = create_list_of_robots(input_data)
 
