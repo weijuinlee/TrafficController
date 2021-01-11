@@ -1,9 +1,10 @@
-from flask import request
+import requests
 import time
 import json
 import math
 import random
 import paho.mqtt.client as mqtt
+# import matplotlib as plt
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.cluster import KMeans

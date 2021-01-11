@@ -4,7 +4,7 @@ from traffic_control_func import patrol_task
 from flask_cors import CORS
 
 app = Flask(__name__)
-api = Api(app)
+# api = Api(app)
 cors = CORS(app)
 
 @app.route('/')
