@@ -183,6 +183,26 @@ def normal_payload(selected_node):
     }'''%(selected_node[0],selected_node[1])
 
     return payload
+    
+def home_payload():
+
+    payload = '''{
+                "modificationType": "CREATE",
+                "abort": false,
+                "taskType": "GOTO",
+                "parameters": {},
+                "point": {
+                    "mapVerID": "b2a546f9-b7a1-4623-8c93-8a574b8db1f6",
+                    "positionName": "Showroom",
+                    "x": 100,
+                    "y": 100,
+                    "heading": 360
+                },
+                "totalTaskNo": 1,
+                "currTaskNo": 1
+    }'''
+
+    return payload
 
 def localisation(robot):
 
@@ -381,6 +401,25 @@ def go_to(vertice, robot, all_vertices_and_coordinates):
 
     localisation(robot)
 
+def go_to_home(robot):
+
+    global complete_from_robot_id
+    mqtt_payload = home_payload()
+    client.publish("%s/robot/task"%robot, mqtt_payload)
+    print("[GOTO] %s is moving to waypoint."%robot)
+
+    while complete_from_robot_id != robot:
+
+        client.subscribe("%s/robot/task/status"%robot)
+        client.on_message=complete_message
+        client.loop(1)
+
+    complete_from_robot_id = None
+
+    print("[Notification] %s has reached waypoint."%robot)
+
+    localisation(robot)
+
 def get_patrol_route_list(input_data):
 
     patrol_route = []
@@ -451,12 +490,12 @@ def patrol_task(input_data):
             robots_planned_route[robot].pop(0)
 
             if robots_planned_route[robot] == []:
-
+                go_to_home(robot)
                 list_of_robots.remove(robot)
 
         if len(list_of_robots) == 0:
 
             finish = True
         
-        print(robots_planned_route)
+        # print(robots_planned_route)
     
