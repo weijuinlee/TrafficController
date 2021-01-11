@@ -13,21 +13,7 @@ cd TrafficController
 ## You need four terminals running:
 
 ### 1.
-```sh
-redis-server
-```
 
-### 2.
-```sh
-rq worker
-```
-
-### 3.
-```sh
-mosquitto
-```
-
-### 4.
 ```sh
 python app.py
 ```
