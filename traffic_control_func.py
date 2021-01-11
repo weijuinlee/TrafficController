@@ -1,4 +1,4 @@
-import requests
+from flask import request
 import time
 import json
 import math
