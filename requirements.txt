@@ -4,6 +4,9 @@
 # Flask-RESTful==0.3.8
 # flask-mqtt==1.1.1
 
+scipy==1.2.3
+numpy==1.18.0
+matplotlib==1.4.3
 paho-mqtt==1.3.0
 aniso8601==8.0.0
 click==7.1.2
