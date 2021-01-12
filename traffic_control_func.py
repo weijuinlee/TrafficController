@@ -223,6 +223,7 @@ def localisation_message(client, userdata, message):
     x_coordinates = message.get('positionX')
     y_coordinate = message.get('positionY')
     all_robots_current_coordinates[robot_id] = [x_coordinates,y_coordinate]
+    print(all_robots_current_coordinates)
 
 def complete_message(client, userdata, message):
 
@@ -234,26 +235,28 @@ def complete_message(client, userdata, message):
 def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,patrol_route):
 
     # print(group_of_robots)
-    # print(list_of_robots)
+    print(list_of_robots)
     # print(patrol_route)
     global complete_from_robot_id
     global all_robots_current_vertice
     global all_robots_current_coordinates
     starting_coordinates = {}
     distance_groups = []
-            
-    for robot in list_of_robots:
+    
+    while len(all_robots_current_coordinates) != len(list_of_robots):
+        
+        for robot in list_of_robots:
 
-        localisation(robot)
+            localisation(robot)
 
-    # print(all_robots_current_coordinates)
+    print(all_robots_current_coordinates)
     # print(vertices_and_coordinates)
     for list_of_robots in group_of_robots:
 
         # for robot in list_of_robots:
 
         #     localisation(robot)
-        # print(all_robots_current_coordinates)
+        print(all_robots_current_coordinates)
         list_of_starting_vertices = list(vertices_and_coordinates.keys())
 
         list_of_distance = []
