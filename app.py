@@ -1,6 +1,7 @@
 import json
 from flask import Flask, jsonify, abort, make_response,request
 from traffic_control_func import patrol_task
+from retrieve_delete import patrol_data, goto_data, delete_task
 from flask_cors import CORS
 from redis_func import redis_conn, redis_queue
 # from multiprocessing import Process
@@ -54,9 +55,39 @@ def home():
 def enqueue():
 
     if request.method == "POST":
+        
         input_data = request.json
-        job = redis_queue.enqueue(patrol_task(input_data),job_timeout=100000)
-    return jsonify({"job_id": job.id})
+        task_type = input_data["type"]
+
+        if task_type == 0:
+
+            tasks = patrol_data()
+
+            if tasks != None:
+
+                delete_task(tasks)
+                job = redis_queue.enqueue(patrol_task(tasks),job_timeout=1000000)
+
+            else:
+
+                return "No scheduled task to be executed."
+
+        if task_type == 1:
+
+            tasks = goto_data()
+
+            if tasks != None:
+
+                delete_task(tasks)
+                job = redis_queue.enqueue(goto_task(tasks),job_timeout=1000000)
+
+            else:
+
+                return "No scheduled task to be executed."
+
+    print("[Status] Tasks completed.")
+    # return jsonify({"job_id": job.id})
+    return "Scheduled tasks completed"
 
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0")

@@ -223,7 +223,7 @@ def localisation_message(client, userdata, message):
     x_coordinates = message.get('positionX')
     y_coordinate = message.get('positionY')
     all_robots_current_coordinates[robot_id] = [x_coordinates,y_coordinate]
-    print(all_robots_current_coordinates)
+    # print(all_robots_current_coordinates)
 
 def complete_message(client, userdata, message):
 
@@ -235,7 +235,7 @@ def complete_message(client, userdata, message):
 def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,patrol_route):
 
     # print(group_of_robots)
-    print(list_of_robots)
+    # print(list_of_robots)
     # print(patrol_route)
     global complete_from_robot_id
     global all_robots_current_vertice
@@ -249,14 +249,14 @@ def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,pa
 
             localisation(robot)
 
-    print(all_robots_current_coordinates)
+    # print(all_robots_current_coordinates)
     # print(vertices_and_coordinates)
     for list_of_robots in group_of_robots:
 
         # for robot in list_of_robots:
 
         #     localisation(robot)
-        print(all_robots_current_coordinates)
+        # print(all_robots_current_coordinates)
         list_of_starting_vertices = list(vertices_and_coordinates.keys())
 
         list_of_distance = []
@@ -290,7 +290,7 @@ def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,pa
         # print(list_of_robots)
         for list_of_distance in distance_groups:
 
-            print(list_of_distance)
+            # print(list_of_distance)
 
             for distance in list_of_distance:
         # while len(list_of_distance) > 0:
@@ -311,7 +311,7 @@ def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,pa
                     list_of_starting_vertices.remove(distance[2])
                     list_of_distance.remove(distance) 
                 
-    print(starting_vertices)
+    # print(starting_vertices)
 
     for robot, vertice in starting_vertices.items():
 
@@ -361,7 +361,7 @@ def route_planning(starting_vertices, patrol_route, input_data):
         for robot, vertices in patrol_route.items():
         # for patrol_route in list_of_patrol_route:
             # for robot, vertice in starting_vertices.items():
-
+            del vertices[-1]
                 # if vertice in patrol_route:
             index = vertices.index(starting_vertices[robot])
             # print(index)
@@ -500,5 +500,7 @@ def patrol_task(input_data):
 
             finish = True
         
-        # print(robots_planned_route)
+        print(robots_planned_route)
+
+    return None
     
