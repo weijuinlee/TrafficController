@@ -65,7 +65,7 @@ def get_patrol_route(input_data):
         patrol_ID = task['patrolID']
         graph_ID = task['graphID']
         robots = task['robots']
-        URL = "https://go-patrol.herokuapp.com/editor/patrol"
+        URL = "http://18.140.162.221:8080/editor/patrol"
         r = requests.get(url = URL)
         graph_data = r.json()
         searched_patrol = next((item for item in graph_data if item.get("id") == patrol_ID and item["graphID"] == graph_ID), None)
@@ -87,7 +87,7 @@ def initialisation(input_data, list_of_patrol_route):
         # print(task)
         task = task['taskDetails']
         graph_ID = task['graphID']
-        URL = "https://go-patrol.herokuapp.com/editor/graph/detailed/%s"%graph_ID
+        URL = "http://18.140.162.221:8080/editor/graph/detailed/%s"%graph_ID
         r = requests.get(url = URL)
         graph_data = r.json()
         vertices = graph_data['vertices']
@@ -432,7 +432,7 @@ def get_patrol_route_list(input_data):
         task = task['taskDetails']
         patrol_ID = task['patrolID']
         graph_ID = task['graphID']
-        URL = "https://go-patrol.herokuapp.com/editor/patrol"
+        URL = "http://18.140.162.221:8080/editor/patrol"
         r = requests.get(url = URL)
         graph_data = r.json()
         searched_patrol = next((item for item in graph_data if item.get("id") == patrol_ID and item["graphID"] == graph_ID), None)

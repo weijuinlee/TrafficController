@@ -1,9 +1,11 @@
-1. FROM python:3.6.1-alpine
+FROM python:3.7
 
-2. WORKDIR /app
+WORKDIR /app
 
-3. ADD . /app
+ADD . /app
 
-4. RUN pip install -r requirements.txt
-5. 
+RUN pip install -r requirements.txt
+ 
 CMD ["python","app.py"]
+
+EXPOSE 3003
