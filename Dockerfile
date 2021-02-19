@@ -1,11 +1,7 @@
 FROM python:3.7
-
-WORKDIR /app
-
-ADD . /app
-
+ENV APP_HOME /app
+WORKDIR $APP_HOME
+COPY . ./
 RUN pip install -r requirements.txt
- 
-CMD ["python","app.py"]
-
+CMD exec gunicorn --bind :3003 --workers 1 --threads 8 app.main:app
 EXPOSE 3003

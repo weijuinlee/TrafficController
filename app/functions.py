@@ -1,3 +1,5 @@
+import time
+from rq import get_current_job
 import requests
 import time
 import json
@@ -8,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ast import literal_eval
 from sklearn.cluster import KMeans
+from rq import get_current_job
 
 broker_address="18.140.162.221"
 client = mqtt.Client("TrafficController") 
@@ -16,7 +19,6 @@ all_robots_current_coordinates = {}
 all_robots_current_vertice = {}
 robots_planned_route = {}
 current_node_used = []
-near_to_goto = False
 complete_from_robot_id = None
 
 # create_list_of_robots returns a list of robots
@@ -125,16 +127,6 @@ def patrol_initialisation(input_data, list_of_patrol_route):
 # goto_initialisation cleans the vertice data to show only vertice and corresponding coordinates
 def goto_initialisation(all_vertices_and_coordinates):
 
-    # print("goto_init")
-    # print(all_vertices_and_coordinates)
-    # all_vertices_and_coordinates = {}
-
-    # for vertice in list(all_vertices_and_coordinates):
-
-    #     if "." in vertice:
-
-    #         del all_vertices_and_coordinates[vertice]
-
     for vertice, vertice_details in all_vertices_and_coordinates.items():
 
         x_coordinate = vertice_details['x']
@@ -142,7 +134,6 @@ def goto_initialisation(all_vertices_and_coordinates):
         coordinates_of_vertice = [x_coordinate,y_coordinate]
         all_vertices_and_coordinates[vertice] = coordinates_of_vertice
 
-    # print(all_vertices_and_coordinates)
     return all_vertices_and_coordinates
     
 # starting_optimizer optimizes the starting positions of patrol robots
@@ -151,7 +142,7 @@ def starting_optimizer(all_vertices_and_coordinates, number_of_robots):
     list_of_vertices = list(all_vertices_and_coordinates.values())
     X = np.array(list_of_vertices)
     plt.scatter(X[:,0],X[:,1], label='True Position')
-    kmeans = KMeans(n_clusters=number_of_robots*2)
+    kmeans = KMeans(n_clusters=number_of_robots)
     kmeans.fit(X)
     list_of_starting_vertices = []
 
@@ -237,7 +228,6 @@ def localisation_message(client, userdata, message):
     x_coordinates = message.get('positionX')
     y_coordinate = message.get('positionY')
     all_robots_current_coordinates[robot_id] = [x_coordinates,y_coordinate]
-    # print(all_robots_current_coordinates)
 
 #complete_message is the extracts the robot id from complete message
 def complete_message(client, userdata, message):
@@ -246,15 +236,12 @@ def complete_message(client, userdata, message):
     global near_to_goto
     message = message.payload.decode("utf-8")
     message = json.loads(message)
-    # print(near_to_goto)
 
     try: 
 
-        if message['taskStatusType'] == 'COMPLETED' or near_to_goto == True:
+        if message['taskStatusType'] == 'COMPLETED':
 
             complete_from_robot_id = message['robot_id']
-        
-        near_to_goto = False
 
     except:
 
@@ -263,9 +250,6 @@ def complete_message(client, userdata, message):
 #starting_position determines the optimal starting position of robots in multi patrol
 def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,patrol_route):
 
-    # print(group_of_robots)
-    # print(list_of_robots)
-    # print(patrol_route)
     global complete_from_robot_id
     global all_robots_current_vertice
     global all_robots_current_coordinates
@@ -278,14 +262,8 @@ def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,pa
 
             localisation(robot)
 
-    # print(all_robots_current_coordinates)
-    # print(vertices_and_coordinates)
     for list_of_robots in group_of_robots:
 
-        # for robot in list_of_robots:
-
-        #     localisation(robot)
-        # print(all_robots_current_coordinates)
         list_of_starting_vertices = list(vertices_and_coordinates.keys())
 
         list_of_distance = []
@@ -306,41 +284,20 @@ def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,pa
         list_of_distance.sort(key = lambda list_of_distance: list_of_distance[0]) 
         distance_groups.append(list_of_distance)
 
-    # print(distance_groups)
-        # print(list_of_distance)
-        # print(patrol_route)
-        # print(list_of_robots)
-        # print(list_of_starting_vertices)
-        # print(starting_vertices)
-        # print(starting_coordinates)
     starting_vertices = {}
 
     for i, list_of_robots in enumerate(group_of_robots):
-        # print(list_of_robots)
+
         for list_of_distance in distance_groups:
 
-            # print(list_of_distance)
-
             for distance in list_of_distance:
-        # while len(list_of_distance) > 0:
-                # print(list_of_robots)
-                # print(distance)
-                # print(distance[2])
-                # print(group_of_robots[i])
-                # print(group_of_robots)
-                # print(list_of_starting_vertices)
-                # print(patrol_route[distance[1]])
+
                 if distance[1] in list_of_robots and distance[2] in list_of_starting_vertices and distance[2] in patrol_route[distance[1]]:
-    #  and distance[2] in patrol_route[distance[1]]
-                    # print(distance)
-                    # print(list_of_starting_vertices)
-                    # print(list_of_robots)
+
                     starting_vertices[distance[1]] = distance[2]
                     list_of_robots.remove(distance[1])
                     list_of_starting_vertices.remove(distance[2])
                     list_of_distance.remove(distance) 
-                
-    # print(starting_vertices)
 
     for robot, vertice in starting_vertices.items():
 
@@ -364,17 +321,17 @@ def starting_position(group_of_robots,list_of_robots,vertices_and_coordinates,pa
 
         localisation(robot)
 
-    # time.sleep(10)
     print("[Status] All robots at starting positions.")
 
     all_robots_current_vertice = starting_vertices
 
-    # print(starting_vertices)
     return starting_vertices
 
 # route_planning performs sequence based approach of path planning
 def route_planning(starting_vertices, patrol_route, input_data):
 
+    print("Testing...")
+    print(starting_vertices)
     robots_planned_route = {}
 
     for i, task in enumerate(input_data):
@@ -408,44 +365,24 @@ def route_planning(starting_vertices, patrol_route, input_data):
 
     return robots_planned_route
 
-def proximity_to_goto(robot, goto_coordinates):
+# proximity_to_vertices allocates vetices to robots not in use
+def proximity_to_vertices(all_vertices_and_coordinates):
 
-    global near_to_goto
-    # print(robot)
-    # print(goto_coordinates)
-    localisation(robot)
-    robot_current_coordinates = all_robots_current_coordinates[robot]
-    # print(robot_current_coordinates)
+    for robot, robot_coordinates in all_robots_current_coordinates.items():
 
-    distance_from_goto = math.sqrt((goto_coordinates[0] - robot_current_coordinates[0]) ** 2 + (goto_coordinates[1] - robot_current_coordinates[1]) ** 2)
+        for vertice, vertice_coordinates in all_vertices_and_coordinates.items():
 
-    print(distance_from_goto)
-    # if distance_from_goto < 50:
+            distance_from_goto = math.sqrt((robot_coordinates[0] - vertice_coordinates[0]) ** 2 + (robot_coordinates[1] - vertice_coordinates[1]) ** 2)
+            print(distance_from_goto)
 
-    #     near_to_goto = True
+            if distance_from_goto < 10 and vertice.find('.') != -1 :
 
-    # # print(all_vertices_and_coordinates)
-
-    # for vertice, coordinate in all_vertices_and_coordinates.items():
-
-    #     # print(vertice)
-    #     # print(vertice.find('.'))
-
-    #     dist =  math.sqrt((coordinate[0] - robot_current_coordinates[0])**2 + (coordinate[1] - robot_current_coordinates[1])**2)
-
-    #     if min_dist is 0:
-
-    #         min_dist = dist
-
-    #     else:
-
-    #         if dist < min_dist:
-
-    #             min_dist = dist
-    #             min_vertice = vertice
+                current_node_used.append(vertice)
+                all_robots_current_vertice[robot] = vertice                
 
     return None
 
+# go_to sends the coordinates of vertice to robot
 def go_to(vertice, robot, all_vertices_and_coordinates):
 
     global complete_from_robot_id
@@ -453,12 +390,9 @@ def go_to(vertice, robot, all_vertices_and_coordinates):
     mqtt_payload = normal_payload(coordinate)
     client.publish("%s/robot/task"%robot, mqtt_payload)
     print("[GOTO] %s is moving to waypoint."%robot)
-    # localisation(robot)
-    print(all_robots_current_coordinates)
 
     while complete_from_robot_id != robot:
 
-        proximity_to_goto(robot,coordinate)
         client.subscribe("%s/robot/task/status"%robot)
         client.on_message=complete_message
         client.loop(1)
@@ -554,12 +488,7 @@ def nearest_vertice(all_vertices_and_coordinates, robot):
     min_dist = 0
     min_vertice = 0
 
-    # print(all_vertices_and_coordinates)
-
     for vertice, coordinate in all_vertices_and_coordinates.items():
-
-        # print(vertice)
-        # print(vertice.find('.'))
 
         dist =  math.sqrt((coordinate[0] - robot_current_coordinates[0])**2 + (coordinate[1] - robot_current_coordinates[1])**2)
 
@@ -579,11 +508,11 @@ def nearest_vertice(all_vertices_and_coordinates, robot):
 # patrol_task performs the patrol task
 def patrol_task(input_data):
 
-    # print(input_data)
     global complete_from_robot_id
     global all_robots_current_vertice
     global current_node_used
 
+    job = get_current_job()
     complete_from_robot_id = None
     patrol_route = get_patrol_route(input_data)
     list_of_patrol_route = get_patrol_route_list(input_data)
@@ -598,6 +527,10 @@ def patrol_task(input_data):
     list_of_robots = create_list_of_robots(input_data)
 
     finish = False
+
+    # Loop through the robots to retrieve the next node in the robot path then check whether the next node is occupied, if occupied, then wait 
+    # else, you send the next node to the robot. if the robot has no more node in the path, then free the robot. If all the robots are free, the job is
+    # completed and return job completed.
 
     while not finish:
 
@@ -623,7 +556,11 @@ def patrol_task(input_data):
 
             finish = True
 
-    return "[Notification] Robots have completed their task."
+    return {
+        "job_id": job.id,
+        "job_enqueued_at": job.enqueued_at.isoformat(),
+        "job_started_at": job.started_at.isoformat(),
+    }
 
 # patrol_task performs the patrol task
 def goto_task(input_data):
@@ -632,6 +569,7 @@ def goto_task(input_data):
     global all_robots_current_vertice
     global current_node_used
 
+    job = get_current_job()
     complete_from_robot_id = None
     detailed_graph = get_detailed_graph(input_data)
     robot = input_data[0]['taskDetails']['robots'][0]['robotID']
@@ -647,11 +585,20 @@ def goto_task(input_data):
     list_of_robots = create_list_of_robots(input_data)
     finish = False
 
+    # Loop through the robots to retrieve the next node in the robot path then check whether the next node is occupied, if occupied, then wait 
+    # else, you send the next node to the robot. if the robot has no more node in the path, then free the robot. If all the robots are free, the job is
+    # completed and return job completed.
+
     while not finish:
 
         for robot in list_of_robots:
 
             selected_node = robots_planned_route[robot][0]
+
+            if selected_node in current_node_used:
+
+                break
+
             current_node_used.append(selected_node)
             all_robots_current_vertice[robot] = selected_node
             go_to(robots_planned_route[robot][0], robot, all_vertices_and_coordinates)
@@ -665,5 +612,9 @@ def goto_task(input_data):
             if len(list_of_robots) == 0:
 
                 finish = True
-
-    return "Completed GOTO Task"
+            
+    return {
+        "job_id": job.id,
+        "job_enqueued_at": job.enqueued_at.isoformat(),
+        "job_started_at": job.started_at.isoformat(),
+    }
