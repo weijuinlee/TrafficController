@@ -12,8 +12,8 @@ from ast import literal_eval
 from sklearn.cluster import KMeans
 from rq import get_current_job
 
-broker_address="18.140.162.221"
-# broker_address="52.220.198.29"
+# broker_address="18.140.162.221"
+broker_address="52.220.198.29"
 client = mqtt.Client("TrafficController") 
 client.connect(broker_address)
 all_robots_current_coordinates = {}
